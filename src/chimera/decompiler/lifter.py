@@ -3,18 +3,18 @@
 from typing import TYPE_CHECKING
 
 from chimera.decompiler.ir import (
-    IRBasicBlock,
-    IRFunction,
-    IRInstruction,
-    IROpcode,
     IRType,
     IRValue,
+    IROpcode,
+    IRFunction,
+    IRBasicBlock,
+    IRInstruction,
 )
 
 if TYPE_CHECKING:
-    from chimera.analysis.cfg import ControlFlowGraph
+    from chimera.analysis.cfg import BasicBlock
     from chimera.analysis.functions import Function
-    from chimera.arch.arm64.instructions import ARM64Instruction
+    from chimera.arch.arm64.instructions import Operand, ARM64Instruction
 
 
 class ARM64Lifter:
@@ -53,7 +53,6 @@ class ARM64Lifter:
 
     def _lift_block(self, block: "BasicBlock") -> IRBasicBlock:  # type: ignore
         """Lift a basic block to IR."""
-        from chimera.analysis.cfg import BasicBlock
 
         ir_block = IRBasicBlock(
             label=f"bb_{block.address:x}",
@@ -71,9 +70,7 @@ class ARM64Lifter:
 
         return ir_block
 
-    def _lift_instruction(
-        self, insn: "ARM64Instruction"
-    ) -> list[IRInstruction]:
+    def _lift_instruction(self, insn: "ARM64Instruction") -> list[IRInstruction]:
         """Lift a single instruction to IR."""
         mnemonic = insn.mnemonic.lower()
 
@@ -188,19 +185,11 @@ class ARM64Lifter:
         if insn.mnemonic.lower() == "movn":
             temp = self._new_temp()
             return [
-                IRInstruction(
-                    IROpcode.NOT, dest=temp, operands=[src], source_addr=insn.address
-                ),
-                IRInstruction(
-                    IROpcode.VAR, dest=dest, operands=[temp], source_addr=insn.address
-                ),
+                IRInstruction(IROpcode.NOT, dest=temp, operands=[src], source_addr=insn.address),
+                IRInstruction(IROpcode.VAR, dest=dest, operands=[temp], source_addr=insn.address),
             ]
 
-        return [
-            IRInstruction(
-                IROpcode.VAR, dest=dest, operands=[src], source_addr=insn.address
-            )
-        ]
+        return [IRInstruction(IROpcode.VAR, dest=dest, operands=[src], source_addr=insn.address)]
 
     def _lift_movk(self, insn: "ARM64Instruction") -> list[IRInstruction]:
         """Lift MOVK instruction (insert bits)."""
@@ -213,9 +202,7 @@ class ARM64Lifter:
         # MOVK inserts 16 bits at a shifted position
         # This is a simplified version
         return [
-            IRInstruction(
-                IROpcode.OR, dest=dest, operands=[dest, imm], source_addr=insn.address
-            )
+            IRInstruction(IROpcode.OR, dest=dest, operands=[dest, imm], source_addr=insn.address)
         ]
 
     def _lift_add(self, insn: "ARM64Instruction") -> list[IRInstruction]:
@@ -228,9 +215,7 @@ class ARM64Lifter:
         op2 = self._get_operand_value(insn, 2)
 
         return [
-            IRInstruction(
-                IROpcode.ADD, dest=dest, operands=[op1, op2], source_addr=insn.address
-            )
+            IRInstruction(IROpcode.ADD, dest=dest, operands=[op1, op2], source_addr=insn.address)
         ]
 
     def _lift_sub(self, insn: "ARM64Instruction") -> list[IRInstruction]:
@@ -243,9 +228,7 @@ class ARM64Lifter:
         op2 = self._get_operand_value(insn, 2)
 
         return [
-            IRInstruction(
-                IROpcode.SUB, dest=dest, operands=[op1, op2], source_addr=insn.address
-            )
+            IRInstruction(IROpcode.SUB, dest=dest, operands=[op1, op2], source_addr=insn.address)
         ]
 
     def _lift_mul(self, insn: "ARM64Instruction") -> list[IRInstruction]:
@@ -258,9 +241,7 @@ class ARM64Lifter:
         op2 = self._get_operand_value(insn, 2)
 
         return [
-            IRInstruction(
-                IROpcode.MUL, dest=dest, operands=[op1, op2], source_addr=insn.address
-            )
+            IRInstruction(IROpcode.MUL, dest=dest, operands=[op1, op2], source_addr=insn.address)
         ]
 
     def _lift_div(self, insn: "ARM64Instruction") -> list[IRInstruction]:
@@ -274,11 +255,7 @@ class ARM64Lifter:
 
         opcode = IROpcode.UDIV if insn.mnemonic.lower() == "udiv" else IROpcode.DIV
 
-        return [
-            IRInstruction(
-                opcode, dest=dest, operands=[op1, op2], source_addr=insn.address
-            )
-        ]
+        return [IRInstruction(opcode, dest=dest, operands=[op1, op2], source_addr=insn.address)]
 
     def _lift_and(self, insn: "ARM64Instruction") -> list[IRInstruction]:
         """Lift AND instruction."""
@@ -290,9 +267,7 @@ class ARM64Lifter:
         op2 = self._get_operand_value(insn, 2)
 
         return [
-            IRInstruction(
-                IROpcode.AND, dest=dest, operands=[op1, op2], source_addr=insn.address
-            )
+            IRInstruction(IROpcode.AND, dest=dest, operands=[op1, op2], source_addr=insn.address)
         ]
 
     def _lift_or(self, insn: "ARM64Instruction") -> list[IRInstruction]:
@@ -305,9 +280,7 @@ class ARM64Lifter:
         op2 = self._get_operand_value(insn, 2)
 
         return [
-            IRInstruction(
-                IROpcode.OR, dest=dest, operands=[op1, op2], source_addr=insn.address
-            )
+            IRInstruction(IROpcode.OR, dest=dest, operands=[op1, op2], source_addr=insn.address)
         ]
 
     def _lift_xor(self, insn: "ARM64Instruction") -> list[IRInstruction]:
@@ -320,9 +293,7 @@ class ARM64Lifter:
         op2 = self._get_operand_value(insn, 2)
 
         return [
-            IRInstruction(
-                IROpcode.XOR, dest=dest, operands=[op1, op2], source_addr=insn.address
-            )
+            IRInstruction(IROpcode.XOR, dest=dest, operands=[op1, op2], source_addr=insn.address)
         ]
 
     def _lift_shl(self, insn: "ARM64Instruction") -> list[IRInstruction]:
@@ -335,9 +306,7 @@ class ARM64Lifter:
         op2 = self._get_operand_value(insn, 2)
 
         return [
-            IRInstruction(
-                IROpcode.SHL, dest=dest, operands=[op1, op2], source_addr=insn.address
-            )
+            IRInstruction(IROpcode.SHL, dest=dest, operands=[op1, op2], source_addr=insn.address)
         ]
 
     def _lift_shr(self, insn: "ARM64Instruction") -> list[IRInstruction]:
@@ -350,9 +319,7 @@ class ARM64Lifter:
         op2 = self._get_operand_value(insn, 2)
 
         return [
-            IRInstruction(
-                IROpcode.SHR, dest=dest, operands=[op1, op2], source_addr=insn.address
-            )
+            IRInstruction(IROpcode.SHR, dest=dest, operands=[op1, op2], source_addr=insn.address)
         ]
 
     def _lift_sar(self, insn: "ARM64Instruction") -> list[IRInstruction]:
@@ -365,9 +332,7 @@ class ARM64Lifter:
         op2 = self._get_operand_value(insn, 2)
 
         return [
-            IRInstruction(
-                IROpcode.SAR, dest=dest, operands=[op1, op2], source_addr=insn.address
-            )
+            IRInstruction(IROpcode.SAR, dest=dest, operands=[op1, op2], source_addr=insn.address)
         ]
 
     def _lift_load(self, insn: "ARM64Instruction") -> list[IRInstruction]:
@@ -381,11 +346,7 @@ class ARM64Lifter:
         # Compute address
         addr = self._compute_memory_address(mem_op)
 
-        return [
-            IRInstruction(
-                IROpcode.LOAD, dest=dest, operands=[addr], source_addr=insn.address
-            )
-        ]
+        return [IRInstruction(IROpcode.LOAD, dest=dest, operands=[addr], source_addr=insn.address)]
 
     def _lift_store(self, insn: "ARM64Instruction") -> list[IRInstruction]:
         """Lift STR instruction."""
@@ -398,11 +359,7 @@ class ARM64Lifter:
         # Compute address
         addr = self._compute_memory_address(mem_op)
 
-        return [
-            IRInstruction(
-                IROpcode.STORE, operands=[addr, src], source_addr=insn.address
-            )
-        ]
+        return [IRInstruction(IROpcode.STORE, operands=[addr, src], source_addr=insn.address)]
 
     def _lift_stp(self, insn: "ARM64Instruction") -> list[IRInstruction]:
         """Lift STP instruction (store pair)."""
@@ -420,15 +377,11 @@ class ARM64Lifter:
         eight = IRValue.constant(8)
 
         return [
-            IRInstruction(
-                IROpcode.STORE, operands=[addr, src1], source_addr=insn.address
-            ),
+            IRInstruction(IROpcode.STORE, operands=[addr, src1], source_addr=insn.address),
             IRInstruction(
                 IROpcode.ADD, dest=addr2, operands=[addr, eight], source_addr=insn.address
             ),
-            IRInstruction(
-                IROpcode.STORE, operands=[addr2, src2], source_addr=insn.address
-            ),
+            IRInstruction(IROpcode.STORE, operands=[addr2, src2], source_addr=insn.address),
         ]
 
     def _lift_ldp(self, insn: "ARM64Instruction") -> list[IRInstruction]:
@@ -447,15 +400,11 @@ class ARM64Lifter:
         eight = IRValue.constant(8)
 
         return [
-            IRInstruction(
-                IROpcode.LOAD, dest=dest1, operands=[addr], source_addr=insn.address
-            ),
+            IRInstruction(IROpcode.LOAD, dest=dest1, operands=[addr], source_addr=insn.address),
             IRInstruction(
                 IROpcode.ADD, dest=addr2, operands=[addr, eight], source_addr=insn.address
             ),
-            IRInstruction(
-                IROpcode.LOAD, dest=dest2, operands=[addr2], source_addr=insn.address
-            ),
+            IRInstruction(IROpcode.LOAD, dest=dest2, operands=[addr2], source_addr=insn.address),
         ]
 
     def _lift_call(self, insn: "ARM64Instruction") -> list[IRInstruction]:
@@ -545,9 +494,7 @@ class ARM64Lifter:
         cmp_op = IROpcode.EQ if insn.mnemonic.lower() == "cbz" else IROpcode.NE
 
         return [
-            IRInstruction(
-                cmp_op, dest=cond, operands=[reg, zero], source_addr=insn.address
-            ),
+            IRInstruction(cmp_op, dest=cond, operands=[reg, zero], source_addr=insn.address),
             IRInstruction(
                 IROpcode.BRANCH,
                 operands=[cond, target, fallthrough],
@@ -567,9 +514,7 @@ class ARM64Lifter:
         flags = IRValue.var("flags", IRType.I64)
 
         return [
-            IRInstruction(
-                IROpcode.SUB, dest=flags, operands=[op1, op2], source_addr=insn.address
-            )
+            IRInstruction(IROpcode.SUB, dest=flags, operands=[op1, op2], source_addr=insn.address)
         ]
 
     def _lift_tst(self, insn: "ARM64Instruction") -> list[IRInstruction]:
@@ -583,9 +528,7 @@ class ARM64Lifter:
         flags = IRValue.var("flags", IRType.I64)
 
         return [
-            IRInstruction(
-                IROpcode.AND, dest=flags, operands=[op1, op2], source_addr=insn.address
-            )
+            IRInstruction(IROpcode.AND, dest=flags, operands=[op1, op2], source_addr=insn.address)
         ]
 
     def _lift_adrp(self, insn: "ARM64Instruction") -> list[IRInstruction]:
@@ -598,9 +541,7 @@ class ARM64Lifter:
         page_addr = self._get_operand_value(insn, 1)
 
         return [
-            IRInstruction(
-                IROpcode.CONST, dest=dest, operands=[page_addr], source_addr=insn.address
-            )
+            IRInstruction(IROpcode.CONST, dest=dest, operands=[page_addr], source_addr=insn.address)
         ]
 
     def _lift_adr(self, insn: "ARM64Instruction") -> list[IRInstruction]:
@@ -611,11 +552,7 @@ class ARM64Lifter:
         dest = self._get_operand_value(insn, 0)
         addr = self._get_operand_value(insn, 1)
 
-        return [
-            IRInstruction(
-                IROpcode.CONST, dest=dest, operands=[addr], source_addr=insn.address
-            )
-        ]
+        return [IRInstruction(IROpcode.CONST, dest=dest, operands=[addr], source_addr=insn.address)]
 
     def _lift_sext(self, insn: "ARM64Instruction") -> list[IRInstruction]:
         """Lift sign extension instructions."""
@@ -625,11 +562,7 @@ class ARM64Lifter:
         dest = self._get_operand_value(insn, 0)
         src = self._get_operand_value(insn, 1)
 
-        return [
-            IRInstruction(
-                IROpcode.SEXT, dest=dest, operands=[src], source_addr=insn.address
-            )
-        ]
+        return [IRInstruction(IROpcode.SEXT, dest=dest, operands=[src], source_addr=insn.address)]
 
     def _lift_zext(self, insn: "ARM64Instruction") -> list[IRInstruction]:
         """Lift zero extension instructions."""
@@ -639,15 +572,10 @@ class ARM64Lifter:
         dest = self._get_operand_value(insn, 0)
         src = self._get_operand_value(insn, 1)
 
-        return [
-            IRInstruction(
-                IROpcode.ZEXT, dest=dest, operands=[src], source_addr=insn.address
-            )
-        ]
+        return [IRInstruction(IROpcode.ZEXT, dest=dest, operands=[src], source_addr=insn.address)]
 
     def _compute_memory_address(self, mem_op: "Operand") -> IRValue:  # type: ignore
         """Compute address from memory operand."""
-        from chimera.arch.arm64.instructions import Operand
 
         if not mem_op.is_memory:
             return IRValue.constant(0, IRType.PTR)
@@ -658,18 +586,6 @@ class ARM64Lifter:
         else:
             base = IRValue.constant(0, IRType.PTR)
 
-        # Add displacement
-        if mem_op.disp:
-            temp = self._new_temp(IRType.PTR)
-            disp = IRValue.constant(mem_op.disp)
-            # We'd need to emit ADD here, but we return the base for simplicity
-            # A full implementation would track this
-            return base
-
-        # Add index register
-        if mem_op.index_reg:
-            # Similar simplification
-            return base
-
+        # Note: displacement and index handling simplified
+        # A full implementation would emit ADD instructions
         return base
-

@@ -3,17 +3,17 @@
 from typing import TYPE_CHECKING
 
 from chimera.decompiler.ir import (
-    IRFunction,
-    IRInstruction,
-    IROpcode,
     IRType,
     IRValue,
+    IROpcode,
+    IRFunction,
+    IRInstruction,
 )
-from chimera.decompiler.structuring import StructuredBlock, StructureType
+from chimera.decompiler.structuring import StructureType, StructuredBlock
 
 if TYPE_CHECKING:
-    from chimera.analysis.functions import Function
     from chimera.loader.symbols import SymbolTable
+    from chimera.analysis.functions import Function
 
 
 class CCodeGenerator:
@@ -64,7 +64,7 @@ class CCodeGenerator:
         """Emit function signature."""
         ret_type = self._type_to_c(self.ir_func.return_type)
         params = []
-        for i, param in enumerate(self.ir_func.params):
+        for param in self.ir_func.params:
             param_type = self._type_to_c(param.ir_type)
             param_name = self._get_var_name(param)
             params.append(f"{param_type} {param_name}")
@@ -382,4 +382,3 @@ def decompile_function(
     # Generate code
     codegen = CCodeGenerator(ir_func, symbols)
     return codegen.generate(structured)
-

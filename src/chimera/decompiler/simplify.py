@@ -1,13 +1,12 @@
 """IR simplification passes."""
 
-from typing import Callable
+from collections.abc import Callable
 
 from chimera.decompiler.ir import (
-    IRBasicBlock,
+    IRValue,
+    IROpcode,
     IRFunction,
     IRInstruction,
-    IROpcode,
-    IRValue,
 )
 
 
@@ -272,9 +271,7 @@ class IRSimplifier:
                     source_addr=insn.source_addr,
                 )
             # x * 0 = 0
-            if (op1.is_const and op1.const_value == 0) or (
-                op2.is_const and op2.const_value == 0
-            ):
+            if (op1.is_const and op1.const_value == 0) or (op2.is_const and op2.const_value == 0):
                 return IRInstruction(
                     IROpcode.CONST,
                     dest=insn.dest,
@@ -294,9 +291,7 @@ class IRSimplifier:
 
         # x & 0 = 0
         if insn.opcode == IROpcode.AND:
-            if (op1.is_const and op1.const_value == 0) or (
-                op2.is_const and op2.const_value == 0
-            ):
+            if (op1.is_const and op1.const_value == 0) or (op2.is_const and op2.const_value == 0):
                 return IRInstruction(
                     IROpcode.CONST,
                     dest=insn.dest,
@@ -388,7 +383,7 @@ class IRSimplifier:
         if insn.opcode == IROpcode.MUL:
             if op2.is_const and op2.const_value is not None:
                 val = op2.const_value
-                if val > 0 and (val & (val - 1)) == 0:
+                if isinstance(val, int) and val > 0 and (val & (val - 1)) == 0:
                     # Power of 2
                     shift = val.bit_length() - 1
                     return IRInstruction(
@@ -402,7 +397,7 @@ class IRSimplifier:
         if insn.opcode == IROpcode.UDIV:
             if op2.is_const and op2.const_value is not None:
                 val = op2.const_value
-                if val > 0 and (val & (val - 1)) == 0:
+                if isinstance(val, int) and val > 0 and (val & (val - 1)) == 0:
                     shift = val.bit_length() - 1
                     return IRInstruction(
                         IROpcode.SHR,
@@ -412,4 +407,3 @@ class IRSimplifier:
                     )
 
         return insn
-

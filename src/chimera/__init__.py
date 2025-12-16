@@ -1,29 +1,26 @@
 """Chimera - A reverse engineering framework for ARM64 macOS binaries."""
 
+from typing import TYPE_CHECKING
 from pathlib import Path
-from typing import Iterator
+from collections.abc import Iterator
 
-from chimera.loader import MachOBinary, Segment, Section, Symbol, SymbolType
-from chimera.arch import ARM64Disassembler, ARM64Instruction
+from chimera.arch import ARM64Instruction, ARM64Disassembler
+from chimera.loader import Symbol, Section, Segment, SymbolType, MachOBinary
+from chimera.project import ProjectDatabase
 from chimera.analysis import (
-    BasicBlock,
-    ControlFlowGraph,
-    Function,
-    FunctionAnalyzer,
     XRef,
+    Function,
     XRefType,
+    BasicBlock,
     XRefManager,
     XRefAnalyzer,
-)
-from chimera.project import ProjectDatabase
-from chimera.decompiler import (
-    IRFunction,
-    ARM64Lifter,
-    IRSimplifier,
-    ControlFlowStructurer,
-    CCodeGenerator,
+    ControlFlowGraph,
+    FunctionAnalyzer,
 )
 from chimera.decompiler.codegen import decompile_function
+
+if TYPE_CHECKING:
+    pass
 
 __version__ = "0.1.0"
 __all__ = [
@@ -38,6 +35,8 @@ __all__ = [
     "XRefType",
     "Symbol",
     "SymbolType",
+    "Segment",
+    "Section",
 ]
 
 
@@ -68,6 +67,7 @@ class Project:
 
         # Store in database
         import hashlib
+
         with open(path, "rb") as f:
             sha256 = hashlib.sha256(f.read()).hexdigest()
 
@@ -255,4 +255,5 @@ class FunctionCollection:
 def main() -> None:
     """Entry point for CLI."""
     from chimera.cli import main as cli_main
+
     cli_main()

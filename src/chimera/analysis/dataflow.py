@@ -1,7 +1,7 @@
 """Data flow analysis."""
 
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
+from dataclasses import field, dataclass
 
 if TYPE_CHECKING:
     from chimera.analysis.cfg import BasicBlock, ControlFlowGraph
@@ -66,11 +66,8 @@ class DataFlowAnalyzer:
 
         return self._reaching_defs
 
-    def _compute_gen_kill(
-        self, block: "BasicBlock", rd: ReachingDefinitions
-    ) -> None:
+    def _compute_gen_kill(self, block: "BasicBlock", rd: ReachingDefinitions) -> None:
         """Compute gen and kill sets for a block."""
-        from chimera.arch.arm64.registers import Registers
 
         for insn in block.instructions:
             # Add definitions to gen
@@ -107,9 +104,7 @@ class DataFlowAnalyzer:
             for reg in insn.writes:
                 rd.kill.add(Definition(address=0, register=reg))
 
-    def get_value_at(
-        self, address: int, register: "ARM64Register"
-    ) -> int | None:
+    def get_value_at(self, address: int, register: "ARM64Register") -> int | None:
         """Try to get the constant value of a register at an address."""
         # Find containing block
         block = None
@@ -143,7 +138,6 @@ class TypePropagator:
     def propagate(self) -> dict[tuple[int, int], str]:
         """Propagate types through the CFG."""
         # Initialize known types (e.g., SP is always pointer)
-        from chimera.arch.arm64.registers import Registers
 
         for block in self.cfg:
             for insn in block.instructions:
@@ -198,18 +192,14 @@ class ConstantFolder:
                 # ADD with immediate adds offset to ADRP result
                 elif insn.mnemonic == "add":
                     if len(insn.operands) >= 3 and insn.writes:
-                        dest = insn.writes[0]
                         src_op = insn.operands[1]
                         imm_op = insn.operands[2]
 
                         if src_op.is_register and src_op.register:
                             base_idx = src_op.register.index
                             if base_idx in adrp_values:
-                                if imm_op.is_immediate and isinstance(
-                                    imm_op.value, int
-                                ):
+                                if imm_op.is_immediate and isinstance(imm_op.value, int):
                                     final_addr = adrp_values[base_idx] + imm_op.value
                                     constants[insn.address] = final_addr
 
         return constants
-

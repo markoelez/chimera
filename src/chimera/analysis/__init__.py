@@ -1,9 +1,9 @@
 """Static analysis module."""
 
-from chimera.analysis.cfg import BasicBlock, ControlFlowGraph, EdgeType
-from chimera.analysis.functions import Function, FunctionAnalyzer
+from chimera.analysis.cfg import EdgeType, BasicBlock, ControlFlowGraph
 from chimera.analysis.xrefs import XRef, XRefType, XRefManager, XRefAnalyzer
 from chimera.analysis.dataflow import DataFlowAnalyzer, ReachingDefinitions
+from chimera.analysis.functions import Function, FunctionAnalyzer
 
 __all__ = [
     "BasicBlock",
@@ -18,4 +18,3 @@ __all__ = [
     "DataFlowAnalyzer",
     "ReachingDefinitions",
 ]
-

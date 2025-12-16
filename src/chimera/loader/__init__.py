@@ -1,8 +1,8 @@
 """Binary loader module for parsing executable formats."""
 
 from chimera.loader.macho import MachOBinary
-from chimera.loader.segments import Segment, Section
 from chimera.loader.symbols import Symbol, SymbolType
+from chimera.loader.segments import Section, Segment
 
 __all__ = [
     "MachOBinary",
@@ -11,4 +11,3 @@ __all__ = [
     "Symbol",
     "SymbolType",
 ]
-

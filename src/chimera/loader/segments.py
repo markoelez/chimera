@@ -1,6 +1,6 @@
 """Memory segment and section models."""
 
-from dataclasses import dataclass, field
+from dataclasses import field, dataclass
 
 
 @dataclass
@@ -29,7 +29,7 @@ class Section:
             raise ValueError(f"Address {addr:#x} not in section {self.name}")
         offset = addr - self.address
         if offset + size > len(self.data):
-            raise ValueError(f"Read beyond section bounds")
+            raise ValueError("Read beyond section bounds")
         return self.data[offset : offset + size]
 
 
@@ -67,4 +67,3 @@ class Segment:
             if section.contains_address(addr):
                 return section
         return None
-

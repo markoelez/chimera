@@ -1,15 +1,14 @@
 """SSA (Static Single Assignment) transformation."""
 
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
+from dataclasses import field, dataclass
 
 from chimera.decompiler.ir import (
-    IRBasicBlock,
-    IRFunction,
-    IRInstruction,
-    IROpcode,
     IRValue,
-    IRType,
+    IROpcode,
+    IRFunction,
+    IRBasicBlock,
+    IRInstruction,
 )
 
 if TYPE_CHECKING:
@@ -65,9 +64,7 @@ class SSATransformer:
                     runner = pred
                     # Walk up dominator tree
                     while runner != block.label:
-                        self._dominance_frontier.setdefault(runner, set()).add(
-                            block.label
-                        )
+                        self._dominance_frontier.setdefault(runner, set()).add(block.label)
                         break  # Simplified
 
     def _insert_phi_nodes(self) -> None:
@@ -186,4 +183,3 @@ class SSATransformer:
         for var, count in pushed.items():
             for _ in range(count):
                 self.ctx.version_stack[var].pop()
-

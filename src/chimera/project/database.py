@@ -2,9 +2,9 @@
 
 import json
 import sqlite3
-from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
+from pathlib import Path
+from dataclasses import dataclass
 
 from chimera.project.annotations import Annotation, AnnotationType
 
@@ -104,9 +104,7 @@ class ProjectDatabase:
                 metadata TEXT
             )
         """)
-        cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_functions_name ON functions(name)"
-        )
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_functions_name ON functions(name)")
 
         # Basic blocks
         cursor.execute("""
@@ -141,9 +139,7 @@ class ProjectDatabase:
                 metadata TEXT
             )
         """)
-        cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_annotations_addr ON annotations(address)"
-        )
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_annotations_addr ON annotations(address)")
 
         # Disassembly cache
         cursor.execute("""
@@ -220,7 +216,7 @@ class ProjectDatabase:
         cursor = self._conn.cursor()
         cursor.execute(
             """
-            INSERT OR REPLACE INTO functions 
+            INSERT OR REPLACE INTO functions
             (address, name, size, end_address, calling_convention, metadata)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
@@ -272,9 +268,7 @@ class ProjectDatabase:
     def get_all_functions(self) -> list[FunctionRecord]:
         """Get all functions."""
         cursor = self._conn.cursor()
-        cursor.execute(
-            "SELECT address, name, size, end_address FROM functions ORDER BY address"
-        )
+        cursor.execute("SELECT address, name, size, end_address FROM functions ORDER BY address")
         return [
             FunctionRecord(
                 address=row["address"],
@@ -387,9 +381,7 @@ class ProjectDatabase:
             (address, AnnotationType.COMMENT.value),
         )
         if comment:
-            self.add_annotation(
-                Annotation(address, AnnotationType.COMMENT, comment)
-            )
+            self.add_annotation(Annotation(address, AnnotationType.COMMENT, comment))
 
     def get_comment(self, address: int) -> str | None:
         """Get comment at address."""
@@ -410,7 +402,7 @@ class ProjectDatabase:
         cursor = self._conn.cursor()
         cursor.execute(
             """
-            INSERT OR REPLACE INTO basic_blocks 
+            INSERT OR REPLACE INTO basic_blocks
             (address, function_addr, size, end_address)
             VALUES (?, ?, ?, ?)
             """,
@@ -423,7 +415,7 @@ class ProjectDatabase:
         cursor = self._conn.cursor()
         cursor.execute(
             """
-            SELECT address, size, end_address 
+            SELECT address, size, end_address
             FROM basic_blocks WHERE function_addr = ? ORDER BY address
             """,
             (function_addr,),
@@ -444,7 +436,7 @@ class ProjectDatabase:
         cursor = self._conn.cursor()
         cursor.execute(
             """
-            INSERT OR REPLACE INTO disasm_cache 
+            INSERT OR REPLACE INTO disasm_cache
             (address, mnemonic, operands, size, bytes)
             VALUES (?, ?, ?, ?, ?)
             """,
@@ -452,9 +444,7 @@ class ProjectDatabase:
         )
         self._conn.commit()
 
-    def get_cached_instruction(
-        self, address: int
-    ) -> dict[str, Any] | None:
+    def get_cached_instruction(self, address: int) -> dict[str, Any] | None:
         """Get cached instruction."""
         cursor = self._conn.cursor()
         cursor.execute(
@@ -469,4 +459,3 @@ class ProjectDatabase:
         cursor = self._conn.cursor()
         cursor.execute("DELETE FROM disasm_cache")
         self._conn.commit()
-

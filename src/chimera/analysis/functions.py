@@ -1,14 +1,15 @@
 """Function detection and analysis."""
 
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Iterator
+from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from collections.abc import Iterator
 
 from chimera.analysis.cfg import BasicBlock, CFGBuilder, ControlFlowGraph
 from chimera.arch.arm64.instructions import ARM64Instruction
 
 if TYPE_CHECKING:
-    from chimera.arch.arm64.decoder import ARM64Disassembler
     from chimera.loader.macho import MachOBinary
+    from chimera.arch.arm64.decoder import ARM64Disassembler
 
 
 @dataclass
@@ -55,9 +56,7 @@ class FunctionAnalyzer:
         bytes([0xFF]),  # Partial match for sub sp
     ]
 
-    def __init__(
-        self, binary: "MachOBinary", disassembler: "ARM64Disassembler"
-    ) -> None:
+    def __init__(self, binary: "MachOBinary", disassembler: "ARM64Disassembler") -> None:
         self.binary = binary
         self.disasm = disassembler
         self.cfg_builder = CFGBuilder(disassembler)
@@ -232,4 +231,3 @@ class FunctionAnalyzer:
             if func.address <= address < func.end_address:
                 return func
         return None
-

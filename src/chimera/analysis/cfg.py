@@ -1,10 +1,14 @@
 """Control flow graph construction and analysis."""
 
-from dataclasses import dataclass, field
 from enum import IntEnum, auto
-from typing import Iterator
+from typing import TYPE_CHECKING
+from dataclasses import field, dataclass
+from collections.abc import Iterator
 
 from chimera.arch.arm64.instructions import ARM64Instruction
+
+if TYPE_CHECKING:
+    from chimera.arch.arm64.decoder import ARM64Disassembler
 
 
 class EdgeType(IntEnum):
@@ -125,9 +129,7 @@ class ControlFlowGraph:
         block = self.blocks.get(address)
         if not block:
             return []
-        return [
-            self.blocks[addr] for addr in block.predecessors if addr in self.blocks
-        ]
+        return [self.blocks[addr] for addr in block.predecessors if addr in self.blocks]
 
     def postorder(self) -> list[BasicBlock]:
         """Return blocks in postorder traversal."""
@@ -170,9 +172,7 @@ class ControlFlowGraph:
                     continue
                 block = self.blocks[addr]
                 if block.predecessors:
-                    new_dom = set.intersection(
-                        *[dom[p] for p in block.predecessors if p in dom]
-                    )
+                    new_dom = set.intersection(*[dom[p] for p in block.predecessors if p in dom])
                     new_dom.add(addr)
                     if new_dom != dom[addr]:
                         dom[addr] = new_dom
@@ -184,8 +184,8 @@ class ControlFlowGraph:
 class CFGBuilder:
     """Builds control flow graphs from disassembled code."""
 
-    def __init__(self, disassembler: "ARM64Disassembler") -> None:  # type: ignore
-        from chimera.arch.arm64.decoder import ARM64Disassembler
+    def __init__(self, disassembler: "ARM64Disassembler") -> None:
+        from chimera.arch.arm64.decoder import ARM64Disassembler  # noqa: F811
 
         self.disasm: ARM64Disassembler = disassembler
 
@@ -209,9 +209,7 @@ class CFGBuilder:
 
         return cfg
 
-    def _find_leaders(
-        self, data: bytes, start: int, end: int
-    ) -> set[int]:
+    def _find_leaders(self, data: bytes, start: int, end: int) -> set[int]:
         """Find all basic block leader addresses."""
         leaders: set[int] = {start}  # Entry is always a leader
 
@@ -247,9 +245,6 @@ class CFGBuilder:
         leaders: set[int],
     ) -> None:
         """Build basic blocks from leaders."""
-        sorted_leaders = sorted(leaders)
-        leader_to_idx = {addr: i for i, addr in enumerate(sorted_leaders)}
-
         current_block: BasicBlock | None = None
         offset = 0
         addr = start
@@ -297,9 +292,7 @@ class CFGBuilder:
                 next_addr = last.next_address
                 if next_addr in cfg.blocks:
                     if last.is_conditional_branch:
-                        cfg.add_edge(
-                            block.address, next_addr, EdgeType.CONDITIONAL_FALSE
-                        )
+                        cfg.add_edge(block.address, next_addr, EdgeType.CONDITIONAL_FALSE)
                     else:
                         cfg.add_edge(block.address, next_addr, EdgeType.FALL_THROUGH)
 
@@ -312,7 +305,4 @@ class CFGBuilder:
                     elif last.is_unconditional_branch:
                         cfg.add_edge(block.address, target, EdgeType.UNCONDITIONAL)
                     elif last.is_conditional_branch:
-                        cfg.add_edge(
-                            block.address, target, EdgeType.CONDITIONAL_TRUE
-                        )
-
+                        cfg.add_edge(block.address, target, EdgeType.CONDITIONAL_TRUE)

@@ -1,8 +1,9 @@
 """Intermediate representation for decompilation."""
 
-from dataclasses import dataclass, field
 from enum import IntEnum, auto
-from typing import Any, Iterator
+from typing import Any
+from dataclasses import field, dataclass
+from collections.abc import Iterator
 
 
 class IRType(IntEnum):
@@ -278,4 +279,3 @@ class IRFunction:
         for block in self:
             lines.append(str(block))
         return "\n".join(lines)
-

@@ -1,13 +1,12 @@
 """Command-line interface for Chimera."""
 
-import sys
 from pathlib import Path
 
 import click
-from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
 from rich.syntax import Syntax
-from rich.panel import Panel
+from rich.console import Console
 
 console = Console()
 
@@ -371,9 +370,8 @@ def interactive_mode(binary: str) -> None:
     console.print("Goodbye!")
 
 
-def _interactive_info(proj: "Project") -> None:
+def _interactive_info(proj) -> None:  # type: ignore[no-untyped-def]
     """Show info in interactive mode."""
-    from chimera import Project
     if not proj.binary:
         return
     b = proj.binary
@@ -383,18 +381,16 @@ def _interactive_info(proj: "Project") -> None:
     console.print(f"Functions: {len(proj.functions)}")
 
 
-def _interactive_funcs(proj: "Project") -> None:
+def _interactive_funcs(proj) -> None:  # type: ignore[no-untyped-def]
     """List functions in interactive mode."""
-    from chimera import Project
     for func in sorted(proj.functions, key=lambda f: f.address)[:20]:
         console.print(f"  {func.address:#x}  {func.name}")
     if len(proj.functions) > 20:
         console.print(f"  ... and {len(proj.functions) - 20} more")
 
 
-def _interactive_disasm(proj: "Project", target: str) -> None:
+def _interactive_disasm(proj, target: str) -> None:  # type: ignore[no-untyped-def]
     """Disassemble in interactive mode."""
-    from chimera import Project
     try:
         addr = int(target, 0)
     except ValueError:
@@ -411,9 +407,8 @@ def _interactive_disasm(proj: "Project", target: str) -> None:
         console.print(f"[red]{e}[/red]")
 
 
-def _interactive_decomp(proj: "Project", target: str) -> None:
+def _interactive_decomp(proj, target: str) -> None:  # type: ignore[no-untyped-def]
     """Decompile in interactive mode."""
-    from chimera import Project
     try:
         code = proj.decompile(target)
         syntax = Syntax(code, "c", theme="monokai")
@@ -422,9 +417,8 @@ def _interactive_decomp(proj: "Project", target: str) -> None:
         console.print(f"[red]{e}[/red]")
 
 
-def _interactive_xrefs(proj: "Project", address: str) -> None:
+def _interactive_xrefs(proj, address: str) -> None:  # type: ignore[no-untyped-def]
     """Show xrefs in interactive mode."""
-    from chimera import Project
     try:
         addr = int(address, 0)
     except ValueError:
@@ -445,9 +439,8 @@ def _interactive_xrefs(proj: "Project", address: str) -> None:
             console.print(f"  {xref.to_addr:#x} ({xref.xref_type.name})")
 
 
-def _interactive_symbols(proj: "Project") -> None:
+def _interactive_symbols(proj) -> None:  # type: ignore[no-untyped-def]
     """Show symbols in interactive mode."""
-    from chimera import Project
     from chimera.loader.symbols import SymbolType
 
     count = 0
@@ -464,4 +457,3 @@ def _interactive_symbols(proj: "Project") -> None:
 
 if __name__ == "__main__":
     main()
-

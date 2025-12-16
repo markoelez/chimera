@@ -1,14 +1,12 @@
 """Mach-O binary format parser for ARM64 macOS."""
 
 import struct
-from dataclasses import dataclass, field
 from enum import IntEnum
 from pathlib import Path
-from typing import BinaryIO
+from dataclasses import field, dataclass
 
+from chimera.loader.symbols import Symbol, SymbolType, SymbolTable
 from chimera.loader.segments import Section, Segment
-from chimera.loader.symbols import Symbol, SymbolTable, SymbolType
-
 
 # Mach-O magic numbers
 MH_MAGIC_64 = 0xFEEDFACF
@@ -303,9 +301,7 @@ class MachOBinary:
             data=sect_data,
         )
 
-    def _parse_symtab_cmd(
-        self, data: bytes, offset: int
-    ) -> tuple[int, int, int, int]:
+    def _parse_symtab_cmd(self, data: bytes, offset: int) -> tuple[int, int, int, int]:
         """Parse LC_SYMTAB command, return (symoff, nsyms, stroff, strsize)."""
         fmt = "<IIIIII"
         fields = struct.unpack(fmt, data[offset : offset + 24])
@@ -468,4 +464,3 @@ class MachOBinary:
         if text:
             return (text.address, text.end_address)
         return None
-

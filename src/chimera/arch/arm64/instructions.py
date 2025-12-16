@@ -1,8 +1,8 @@
 """ARM64 instruction model."""
 
-from dataclasses import dataclass, field
 from enum import IntEnum, auto
 from typing import TYPE_CHECKING
+from dataclasses import field, dataclass
 
 if TYPE_CHECKING:
     from chimera.arch.arm64.registers import ARM64Register
@@ -192,4 +192,3 @@ class ARM64Instruction:
         """Format instruction with hex bytes."""
         hex_bytes = " ".join(f"{b:02x}" for b in self.bytes)
         return f"{self.address:016x}  {hex_bytes:<12}  {self}"
-

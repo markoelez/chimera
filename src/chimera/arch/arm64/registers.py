@@ -1,7 +1,7 @@
 """ARM64 register model."""
 
-from dataclasses import dataclass
 from enum import IntEnum, auto
+from dataclasses import dataclass
 
 
 class RegisterType(IntEnum):
@@ -200,4 +200,3 @@ CALLER_SAVED = [
     Registers.X17,
     Registers.X18,
 ]
-

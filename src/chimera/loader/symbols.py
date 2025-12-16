@@ -1,7 +1,7 @@
 """Symbol table handling."""
 
-from dataclasses import dataclass
 from enum import IntEnum, auto
+from dataclasses import dataclass
 
 
 class SymbolType(IntEnum):
@@ -86,4 +86,3 @@ class SymbolTable:
     def imports(self) -> list[Symbol]:
         """Get all imported/undefined symbols."""
         return [s for s in self._all if s.symbol_type == SymbolType.UNDEFINED]
-

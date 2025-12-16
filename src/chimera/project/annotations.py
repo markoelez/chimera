@@ -1,8 +1,8 @@
 """User annotations for reverse engineering."""
 
-from dataclasses import dataclass
 from enum import IntEnum, auto
 from typing import Any
+from dataclasses import dataclass
 
 
 class AnnotationType(IntEnum):
@@ -27,4 +27,3 @@ class Annotation:
     def __repr__(self) -> str:
         type_str = self.annotation_type.name.lower()
         return f"Annotation({self.address:#x}, {type_str}, {self.value!r})"
-

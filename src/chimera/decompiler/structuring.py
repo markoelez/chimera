@@ -1,15 +1,15 @@
 """Control flow structuring for decompilation."""
 
-from dataclasses import dataclass, field
 from enum import IntEnum, auto
 from typing import Any
+from dataclasses import field, dataclass
 
 from chimera.decompiler.ir import (
-    IRBasicBlock,
-    IRFunction,
-    IRInstruction,
-    IROpcode,
     IRValue,
+    IROpcode,
+    IRFunction,
+    IRBasicBlock,
+    IRInstruction,
 )
 
 
@@ -96,9 +96,7 @@ class ControlFlowStructurer:
                     self._loop_headers.add(succ)
                     self._loop_exits[succ] = block.label
 
-    def _structure_region(
-        self, start: str, stop_at: set[str]
-    ) -> StructuredBlock:
+    def _structure_region(self, start: str, stop_at: set[str]) -> StructuredBlock:
         """Structure a region of the CFG."""
         if start in self._visited:
             # Already processed or loop
@@ -185,16 +183,8 @@ class ControlFlowStructurer:
         condition = terminator.operands[0]
 
         # Get true and false targets
-        true_target = (
-            block.successors[0]
-            if block.successors
-            else None
-        )
-        false_target = (
-            block.successors[1]
-            if len(block.successors) > 1
-            else None
-        )
+        true_target = block.successors[0] if block.successors else None
+        false_target = block.successors[1] if len(block.successors) > 1 else None
 
         # Find merge point (common successor)
         merge_point = self._find_merge_point(true_target, false_target)
@@ -238,9 +228,7 @@ class ControlFlowStructurer:
 
         return result
 
-    def _structure_loop(
-        self, header: IRBasicBlock, stop_at: set[str]
-    ) -> StructuredBlock:
+    def _structure_loop(self, header: IRBasicBlock, stop_at: set[str]) -> StructuredBlock:
         """Structure a loop."""
         # Find loop exit
         exit_block = None
@@ -295,9 +283,7 @@ class ControlFlowStructurer:
 
         return loop_block
 
-    def _find_merge_point(
-        self, branch1: str | None, branch2: str | None
-    ) -> str | None:
+    def _find_merge_point(self, branch1: str | None, branch2: str | None) -> str | None:
         """Find common merge point of two branches."""
         if not branch1 or not branch2:
             return None
@@ -338,4 +324,3 @@ class ControlFlowStructurer:
             depth += 1
 
         return reachable
-

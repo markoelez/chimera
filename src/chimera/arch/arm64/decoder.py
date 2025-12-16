@@ -1,17 +1,17 @@
 """ARM64 instruction decoder using capstone."""
 
-from typing import Iterator
+from collections.abc import Iterator
 
 import capstone
 from capstone import arm64_const
 
+from chimera.arch.arm64.registers import Registers, ARM64Register
 from chimera.arch.arm64.instructions import (
-    ARM64Instruction,
-    InstructionGroup,
     Operand,
     OperandType,
+    ARM64Instruction,
+    InstructionGroup,
 )
-from chimera.arch.arm64.registers import ARM64Register, RegisterType, Registers
 
 
 class ARM64Disassembler:
@@ -27,16 +27,12 @@ class ARM64Disassembler:
             return self._convert_instruction(insn)
         return None
 
-    def disassemble(
-        self, data: bytes, address: int, count: int = 0
-    ) -> Iterator[ARM64Instruction]:
+    def disassemble(self, data: bytes, address: int, count: int = 0) -> Iterator[ARM64Instruction]:
         """Disassemble a sequence of instructions."""
         for insn in self._cs.disasm(data, address, count=count):
             yield self._convert_instruction(insn)
 
-    def disassemble_range(
-        self, data: bytes, start: int, end: int
-    ) -> Iterator[ARM64Instruction]:
+    def disassemble_range(self, data: bytes, start: int, end: int) -> Iterator[ARM64Instruction]:
         """Disassemble all instructions in an address range."""
         offset = 0
         addr = start
@@ -109,9 +105,7 @@ class ARM64Disassembler:
             branch_target=branch_target,
         )
 
-    def _convert_operand(
-        self, op: capstone.arm64.Arm64Op, insn: capstone.CsInsn
-    ) -> Operand:
+    def _convert_operand(self, op: capstone.arm64.Arm64Op, insn: capstone.CsInsn) -> Operand:
         """Convert capstone operand to our model."""
         if op.type == arm64_const.ARM64_OP_REG:
             reg = self._get_register(op.reg)
@@ -263,4 +257,3 @@ class ARM64Disassembler:
             return False
 
         return True
-

@@ -14,9 +14,35 @@ dependencies = [
     "click>=8.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.8.0",
+    "pyright>=1.1.390",
+    "pytest>=8.0",
+    "pytest-cov>=4.0",
+    "pre-commit>=4.0",
+]
+
 [project.scripts]
 chimera = "chimera.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.9.18,<0.10.0"]
 build-backend = "uv_build"
+
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "basic"
+include = ["src"]
+exclude = ["**/__pycache__", "tests"]
+reportMissingImports = true
+reportMissingTypeStubs = false
+reportUnhashable = false
+reportArgumentType = "warning"
+reportAssignmentType = "warning"
+reportOperatorIssue = "warning"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-v --tb=short"

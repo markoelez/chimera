@@ -1,12 +1,15 @@
 """Cross-reference tracking and analysis."""
 
-from dataclasses import dataclass
 from enum import IntEnum, auto
-from typing import TYPE_CHECKING, Iterator
+from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from collections.abc import Iterator
 
 if TYPE_CHECKING:
-    from chimera.arch.arm64.decoder import ARM64Disassembler
     from chimera.loader.macho import MachOBinary
+    from chimera.loader.segments import Section
+    from chimera.arch.arm64.decoder import ARM64Disassembler
+    from chimera.arch.arm64.instructions import ARM64Instruction
 
 
 class XRefType(IntEnum):
@@ -56,9 +59,7 @@ class XRefManager:
             self._from_index[xref.from_addr] = []
         self._from_index[xref.from_addr].append(xref)
 
-    def add_xref(
-        self, from_addr: int, to_addr: int, xref_type: XRefType
-    ) -> XRef:
+    def add_xref(self, from_addr: int, to_addr: int, xref_type: XRefType) -> XRef:
         """Create and add a cross-reference."""
         xref = XRef(from_addr, to_addr, xref_type)
         self.add(xref)
@@ -91,11 +92,7 @@ class XRefManager:
     def data_refs_to(self, address: int) -> list[XRef]:
         """Get all data references to an address."""
         data_types = {XRefType.DATA_READ, XRefType.DATA_WRITE, XRefType.DATA_REF}
-        return [
-            xref
-            for xref in self._to_index.get(address, [])
-            if xref.xref_type in data_types
-        ]
+        return [xref for xref in self._to_index.get(address, []) if xref.xref_type in data_types]
 
     def __iter__(self) -> Iterator[XRef]:
         return iter(self._xrefs)
@@ -107,9 +104,7 @@ class XRefManager:
 class XRefAnalyzer:
     """Analyzes binary to extract cross-references."""
 
-    def __init__(
-        self, binary: "MachOBinary", disassembler: "ARM64Disassembler"
-    ) -> None:
+    def __init__(self, binary: "MachOBinary", disassembler: "ARM64Disassembler") -> None:
         self.binary = binary
         self.disasm = disassembler
         self.xrefs = XRefManager()
@@ -147,9 +142,7 @@ class XRefAnalyzer:
                     if insn.operands[1].is_immediate:
                         target = insn.operands[1].value
                         if isinstance(target, int):
-                            self.xrefs.add_xref(
-                                insn.address, target, XRefType.DATA_REF
-                            )
+                            self.xrefs.add_xref(insn.address, target, XRefType.DATA_REF)
 
             # ADR instruction
             elif insn.mnemonic == "adr":
@@ -157,9 +150,7 @@ class XRefAnalyzer:
                     if insn.operands[1].is_immediate:
                         target = insn.operands[1].value
                         if isinstance(target, int):
-                            self.xrefs.add_xref(
-                                insn.address, target, XRefType.DATA_REF
-                            )
+                            self.xrefs.add_xref(insn.address, target, XRefType.DATA_REF)
 
             # Load instructions with PC-relative addressing
             elif insn.is_load:
@@ -170,10 +161,11 @@ class XRefAnalyzer:
                 self._handle_memory_ref(insn, XRefType.DATA_WRITE)
 
     def _handle_memory_ref(
-        self, insn: "ARM64Instruction", xref_type: XRefType  # type: ignore
+        self,
+        insn: "ARM64Instruction",
+        xref_type: XRefType,  # type: ignore
     ) -> None:
         """Handle memory reference instructions."""
-        from chimera.arch.arm64.instructions import ARM64Instruction
 
         # Look for literal pool loads (ldr x0, =label)
         if insn.mnemonic.startswith("ldr") and "=" in insn.op_str:
@@ -201,7 +193,6 @@ class XRefAnalyzer:
 
     def _scan_pointers(self, section: "Section") -> None:  # type: ignore
         """Scan section for pointer values."""
-        from chimera.loader.segments import Section
 
         data = section.data
         addr = section.address
@@ -218,4 +209,3 @@ class XRefAnalyzer:
             target_section = self.binary.section_at_address(ptr)
             if target_section:
                 self.xrefs.add_xref(addr + i, ptr, XRefType.POINTER)
-
