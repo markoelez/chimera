@@ -79,6 +79,10 @@ class IRSimplifier:
         if v1 is None or v2 is None:
             return insn
 
+        # Bitwise operations require integers
+        if not isinstance(v1, int) or not isinstance(v2, int):
+            return insn
+
         result: int | None = None
 
         if insn.opcode == IROpcode.ADD:

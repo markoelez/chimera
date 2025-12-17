@@ -23,13 +23,21 @@ class ARM64Disassembler:
 
     def disassemble_one(self, data: bytes, address: int) -> ARM64Instruction | None:
         """Disassemble a single instruction."""
-        for insn in self._cs.disasm(data[:4], address, count=1):
+        for insn in self._cs.disasm(  # ty: ignore[missing-argument]
+            data[:4],  # ty: ignore[invalid-argument-type]
+            address,
+            count=1,
+        ):
             return self._convert_instruction(insn)
         return None
 
     def disassemble(self, data: bytes, address: int, count: int = 0) -> Iterator[ARM64Instruction]:
         """Disassemble a sequence of instructions."""
-        for insn in self._cs.disasm(data, address, count=count):
+        for insn in self._cs.disasm(  # ty: ignore[missing-argument]
+            data,  # ty: ignore[invalid-argument-type]
+            address,
+            count=count,
+        ):
             yield self._convert_instruction(insn)
 
     def disassemble_range(self, data: bytes, start: int, end: int) -> Iterator[ARM64Instruction]:
