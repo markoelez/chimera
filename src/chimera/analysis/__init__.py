@@ -2,6 +2,13 @@
 
 from chimera.analysis.cfg import EdgeType, BasicBlock, ControlFlowGraph
 from chimera.analysis.xrefs import XRef, XRefType, XRefManager, XRefAnalyzer
+from chimera.analysis.search import (
+    StringMatch,
+    PatternMatch,
+    SearchResults,
+    PatternScanner,
+    StringSearcher,
+)
 from chimera.analysis.dataflow import DataFlowAnalyzer, ReachingDefinitions
 from chimera.analysis.functions import Function, FunctionAnalyzer
 
@@ -17,4 +24,9 @@ __all__ = [
     "XRefAnalyzer",
     "DataFlowAnalyzer",
     "ReachingDefinitions",
+    "StringMatch",
+    "PatternMatch",
+    "StringSearcher",
+    "PatternScanner",
+    "SearchResults",
 ]

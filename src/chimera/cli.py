@@ -310,6 +310,155 @@ def symbols(binary: str) -> None:
         console.print(table)
 
 
+@main.command("strings")
+@click.argument("binary", type=click.Path(exists=True))
+@click.option("-n", "--min-length", default=4, help="Minimum string length")
+@click.option("-s", "--search", "query", default=None, help="Filter strings containing text")
+@click.option("-i", "--ignore-case", is_flag=True, help="Case-insensitive search")
+@click.option("--section", default=None, help="Limit to specific section")
+@click.option("--limit", default=100, help="Maximum results to show")
+def strings_cmd(
+    binary: str,
+    min_length: int,
+    query: str | None,
+    ignore_case: bool,
+    section: str | None,
+    limit: int,
+) -> None:
+    """Extract and search strings in binary."""
+    from chimera import Project
+
+    with Project.load(binary) as proj:
+        if not proj.binary:
+            console.print("[red]Failed to load binary[/red]")
+            return
+
+        sections = {section} if section else None
+
+        if query:
+            # Search mode
+            matches = proj.search_strings(
+                query,
+                case_sensitive=not ignore_case,
+                min_length=min_length,
+            )
+            # Filter by section if specified
+            if section:
+                matches = [m for m in matches if m.section == section]
+        else:
+            # List all strings
+            matches = proj.strings(min_length, sections)
+
+        if not matches:
+            console.print("[dim]No strings found[/dim]")
+            return
+
+        table = Table(title=f"Strings ({len(matches)} found)")
+        table.add_column("Address", style="green")
+        table.add_column("Section", style="cyan")
+        table.add_column("String")
+
+        for match in matches[:limit]:
+            # Truncate long strings for display
+            value = match.value
+            if len(value) > 60:
+                value = value[:57] + "..."
+            # Escape control characters for display
+            value = value.replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+
+            table.add_row(
+                f"{match.address:#x}",
+                match.section,
+                value,
+            )
+
+        console.print(table)
+
+        if len(matches) > limit:
+            console.print(
+                f"\n[dim]Showing {limit} of {len(matches)} results. Use --limit to see more.[/dim]"
+            )
+
+
+@main.command("search")
+@click.argument("binary", type=click.Path(exists=True))
+@click.argument("pattern")
+@click.option("--section", default=None, help="Limit to specific section")
+@click.option("--limit", default=50, help="Maximum results to show")
+@click.option("-c", "--context", default=0, help="Bytes of context to show before/after")
+def search_cmd(
+    binary: str,
+    pattern: str,
+    section: str | None,
+    limit: int,
+    context: int,
+) -> None:
+    """Search for byte patterns in binary.
+
+    PATTERN is a hex string with optional wildcards (??).
+
+    Examples:
+
+        chimera search binary "48 8b"           # Exact bytes
+
+        chimera search binary "fd 7b ?? a9"     # With wildcard
+
+        chimera search binary "ff4300"          # No spaces
+    """
+    from chimera import Project
+
+    with Project.load(binary) as proj:
+        if not proj.binary:
+            console.print("[red]Failed to load binary[/red]")
+            return
+
+        sections = {section} if section else None
+
+        try:
+            matches = proj.search_bytes(pattern, sections)
+        except ValueError as e:
+            console.print(f"[red]Invalid pattern: {e}[/red]")
+            return
+
+        if not matches:
+            console.print("[dim]No matches found[/dim]")
+            return
+
+        console.print(f"[bold]Pattern:[/bold] {pattern}\n")
+
+        table = Table(title=f"Matches ({len(matches)} found)")
+        table.add_column("Address", style="green")
+        table.add_column("Section", style="cyan")
+        table.add_column("Bytes")
+
+        for match in matches[:limit]:
+            hex_bytes = " ".join(f"{b:02x}" for b in match.matched_bytes)
+
+            # Add context if requested
+            if context > 0:
+                try:
+                    before = proj.read(match.address - context, context)
+                    after = proj.read(match.address + len(match.matched_bytes), context)
+                    before_hex = " ".join(f"{b:02x}" for b in before)
+                    after_hex = " ".join(f"{b:02x}" for b in after)
+                    hex_bytes = f"[dim]{before_hex}[/dim] {hex_bytes} [dim]{after_hex}[/dim]"
+                except ValueError:
+                    pass  # Can't read context at boundaries
+
+            table.add_row(
+                f"{match.address:#x}",
+                match.section,
+                hex_bytes,
+            )
+
+        console.print(table)
+
+        if len(matches) > limit:
+            console.print(
+                f"\n[dim]Showing {limit} of {len(matches)} results. Use --limit to see more.[/dim]"
+            )
+
+
 @main.command("interactive")
 @click.argument("binary", type=click.Path(exists=True))
 def interactive_mode(binary: str) -> None:

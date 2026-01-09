@@ -12,8 +12,12 @@ from chimera.analysis import (
     Function,
     XRefType,
     BasicBlock,
+    StringMatch,
     XRefManager,
+    PatternMatch,
     XRefAnalyzer,
+    PatternScanner,
+    StringSearcher,
     ControlFlowGraph,
     FunctionAnalyzer,
 )
@@ -37,6 +41,8 @@ __all__ = [
     "SymbolType",
     "Segment",
     "Section",
+    "StringMatch",
+    "PatternMatch",
 ]
 
 
@@ -185,6 +191,67 @@ class Project:
         if not self.binary:
             return None
         return self.binary.symbols.closest_symbol(address)
+
+    def strings(
+        self,
+        min_length: int = 4,
+        sections: set[str] | None = None,
+    ) -> list[StringMatch]:
+        """Extract strings from binary.
+
+        Args:
+            min_length: Minimum string length to include
+            sections: Section names to search (None for defaults)
+
+        Returns:
+            List of StringMatch sorted by address
+        """
+        if not self.binary:
+            raise ValueError("No binary loaded")
+        searcher = StringSearcher(self.binary)
+        return searcher.find_strings(min_length, sections)
+
+    def search_strings(
+        self,
+        query: str,
+        case_sensitive: bool = True,
+        min_length: int = 4,
+    ) -> list[StringMatch]:
+        """Search for strings containing query.
+
+        Args:
+            query: Text to search for
+            case_sensitive: Whether search is case-sensitive
+            min_length: Minimum string length
+
+        Returns:
+            List of matching StringMatch sorted by address
+        """
+        if not self.binary:
+            raise ValueError("No binary loaded")
+        searcher = StringSearcher(self.binary)
+        return searcher.search(query, case_sensitive, min_length)
+
+    def search_bytes(
+        self,
+        pattern: str,
+        sections: set[str] | None = None,
+    ) -> list[PatternMatch]:
+        """Search for byte pattern with optional wildcards.
+
+        Pattern format: "48 8b ?? c3" where ?? is wildcard.
+
+        Args:
+            pattern: Hex byte pattern with optional ?? wildcards
+            sections: Section names to search (None for all)
+
+        Returns:
+            List of PatternMatch sorted by address
+        """
+        if not self.binary:
+            raise ValueError("No binary loaded")
+        scanner = PatternScanner(self.binary)
+        return scanner.scan(pattern, sections)
 
     @property
     def entry_point(self) -> int:
