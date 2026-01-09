@@ -459,6 +459,155 @@ def search_cmd(
             )
 
 
+@main.command("objc")
+@click.argument("binary", type=click.Path(exists=True))
+@click.option("--classes", "list_classes", is_flag=True, help="List all classes")
+@click.option("--class", "class_name", default=None, help="Show details for a class")
+@click.option("--protocols", is_flag=True, help="List all protocols")
+@click.option("--categories", is_flag=True, help="List all categories")
+@click.option("--selector", default=None, help="Find methods by selector name")
+def objc_cmd(
+    binary: str,
+    list_classes: bool,
+    class_name: str | None,
+    protocols: bool,
+    categories: bool,
+    selector: str | None,
+) -> None:
+    """Analyze Objective-C metadata."""
+    from chimera import Project
+
+    with Project.load(binary) as proj:
+        proj.analyze()
+
+        if not proj.objc:
+            console.print("[dim]No Objective-C metadata found[/dim]")
+            return
+
+        objc = proj.objc
+
+        if class_name:
+            # Show details for a specific class
+            cls = objc.get_class(class_name)
+            if not cls:
+                console.print(f"[red]Class not found: {class_name}[/red]")
+                return
+
+            console.print(f"\n[bold]Class: {cls.name}[/bold] @ {cls.address:#x}")
+            console.print(f"Superclass: {cls.superclass or 'None'}")
+            console.print(f"Instance Size: {cls.instance_size} bytes")
+
+            if cls.protocols:
+                console.print(f"Protocols: {', '.join(cls.protocols)}")
+
+            if cls.instance_methods:
+                console.print("\n[bold]Instance Methods:[/bold]")
+                for method in cls.instance_methods:
+                    console.print(
+                        f"  [cyan]-[{cls.name} {method.selector}][/cyan] @ {method.address:#x}"
+                    )
+
+            if cls.class_methods:
+                console.print("\n[bold]Class Methods:[/bold]")
+                for method in cls.class_methods:
+                    console.print(
+                        f"  [cyan]+[{cls.name} {method.selector}][/cyan] @ {method.address:#x}"
+                    )
+
+            if cls.properties:
+                console.print("\n[bold]Properties:[/bold]")
+                for prop in cls.properties:
+                    console.print(f"  {prop.name}: {prop.attributes}")
+
+            if cls.ivars:
+                console.print("\n[bold]Instance Variables:[/bold]")
+                for ivar in cls.ivars:
+                    console.print(
+                        f"  {ivar.name}: {ivar.type_encoding} (offset: {ivar.offset}, size: {ivar.size})"
+                    )
+
+        elif selector:
+            # Find methods by selector
+            matches = objc.methods_named(selector)
+            if not matches:
+                console.print(f"[dim]No methods found with selector: {selector}[/dim]")
+                return
+
+            console.print(f"\n[bold]Methods matching '{selector}':[/bold]\n")
+            table = Table()
+            table.add_column("Class", style="cyan")
+            table.add_column("Type")
+            table.add_column("Address", style="green")
+
+            for cls, method in matches:
+                prefix = "+" if method.is_class_method else "-"
+                table.add_row(cls.name, prefix, f"{method.address:#x}")
+
+            console.print(table)
+
+        elif protocols:
+            # List all protocols
+            proto_list = objc.protocols
+            if not proto_list:
+                console.print("[dim]No protocols found[/dim]")
+                return
+
+            table = Table(title=f"Protocols ({len(proto_list)} found)")
+            table.add_column("Address", style="green")
+            table.add_column("Name", style="cyan")
+            table.add_column("Methods")
+
+            for proto in proto_list:
+                method_count = len(proto.instance_methods) + len(proto.class_methods)
+                table.add_row(f"{proto.address:#x}", proto.name, str(method_count))
+
+            console.print(table)
+
+        elif categories:
+            # List all categories
+            cat_list = objc.categories
+            if not cat_list:
+                console.print("[dim]No categories found[/dim]")
+                return
+
+            table = Table(title=f"Categories ({len(cat_list)} found)")
+            table.add_column("Address", style="green")
+            table.add_column("Category", style="cyan")
+            table.add_column("Class", style="yellow")
+            table.add_column("Methods")
+
+            for cat in cat_list:
+                method_count = len(cat.instance_methods) + len(cat.class_methods)
+                table.add_row(f"{cat.address:#x}", cat.name, cat.class_name, str(method_count))
+
+            console.print(table)
+
+        else:
+            # Default: list all classes (or if --classes flag)
+            classes = objc.classes
+            if not classes:
+                console.print("[dim]No Objective-C classes found[/dim]")
+                return
+
+            table = Table(title=f"Objective-C Classes ({len(classes)} found)")
+            table.add_column("Address", style="green")
+            table.add_column("Class", style="cyan")
+            table.add_column("Superclass")
+            table.add_column("Methods", justify="right")
+            table.add_column("Ivars", justify="right")
+
+            for cls in classes:
+                table.add_row(
+                    f"{cls.address:#x}",
+                    cls.name,
+                    cls.superclass or "",
+                    str(cls.method_count),
+                    str(len(cls.ivars)),
+                )
+
+            console.print(table)
+
+
 @main.command("interactive")
 @click.argument("binary", type=click.Path(exists=True))
 def interactive_mode(binary: str) -> None:

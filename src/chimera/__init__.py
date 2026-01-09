@@ -11,9 +11,13 @@ from chimera.analysis import (
     XRef,
     Function,
     XRefType,
+    ObjCClass,
     BasicBlock,
+    ObjCMethod,
     StringMatch,
     XRefManager,
+    ObjCAnalyzer,
+    ObjCMetadata,
     PatternMatch,
     XRefAnalyzer,
     PatternScanner,
@@ -43,6 +47,9 @@ __all__ = [
     "Section",
     "StringMatch",
     "PatternMatch",
+    "ObjCClass",
+    "ObjCMethod",
+    "ObjCMetadata",
 ]
 
 
@@ -55,6 +62,7 @@ class Project:
         self.db = ProjectDatabase()
         self._functions: dict[int, Function] = {}
         self._xrefs: XRefManager | None = None
+        self._objc: ObjCMetadata | None = None
         self._analyzed = False
 
         if binary_path:
@@ -112,6 +120,10 @@ class Project:
         # Store xrefs in database
         for xref in self._xrefs:
             self.db.add_xref(xref.from_addr, xref.to_addr, xref.xref_type.name)
+
+        # Objective-C metadata analysis
+        objc_analyzer = ObjCAnalyzer(self.binary)
+        self._objc = objc_analyzer.analyze()
 
         self._analyzed = True
 
@@ -252,6 +264,17 @@ class Project:
             raise ValueError("No binary loaded")
         scanner = PatternScanner(self.binary)
         return scanner.scan(pattern, sections)
+
+    @property
+    def objc(self) -> ObjCMetadata | None:
+        """Get Objective-C metadata (requires analyze() first)."""
+        return self._objc
+
+    def get_objc_class(self, name: str) -> ObjCClass | None:
+        """Get Objective-C class by name."""
+        if self._objc:
+            return self._objc.get_class(name)
+        return None
 
     @property
     def entry_point(self) -> int:

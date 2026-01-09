@@ -1,6 +1,16 @@
 """Static analysis module."""
 
 from chimera.analysis.cfg import EdgeType, BasicBlock, ControlFlowGraph
+from chimera.analysis.objc import (
+    ObjCIvar,
+    ObjCClass,
+    ObjCMethod,
+    ObjCAnalyzer,
+    ObjCCategory,
+    ObjCMetadata,
+    ObjCProperty,
+    ObjCProtocol,
+)
 from chimera.analysis.xrefs import XRef, XRefType, XRefManager, XRefAnalyzer
 from chimera.analysis.search import (
     StringMatch,
@@ -29,4 +39,12 @@ __all__ = [
     "StringSearcher",
     "PatternScanner",
     "SearchResults",
+    "ObjCMethod",
+    "ObjCIvar",
+    "ObjCProperty",
+    "ObjCProtocol",
+    "ObjCCategory",
+    "ObjCClass",
+    "ObjCMetadata",
+    "ObjCAnalyzer",
 ]
