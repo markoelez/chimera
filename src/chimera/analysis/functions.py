@@ -205,21 +205,3 @@ class FunctionAnalyzer:
                 return True
 
         return False
-
-    def get_function(self, address: int) -> Function | None:
-        """Get function by address."""
-        return self.functions.get(address)
-
-    def get_function_by_name(self, name: str) -> Function | None:
-        """Get function by name."""
-        for func in self.functions.values():
-            if func.name == name:
-                return func
-        return None
-
-    def function_containing(self, address: int) -> Function | None:
-        """Find function containing an address."""
-        for func in self.functions.values():
-            if func.address <= address < func.end_address:
-                return func
-        return None

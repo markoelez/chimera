@@ -1,5 +1,6 @@
 """Chimera - A reverse engineering framework for ARM64 macOS binaries."""
 
+import hashlib
 from pathlib import Path
 from collections.abc import Iterator
 
@@ -86,8 +87,6 @@ class Project:
         self.binary = MachOBinary.load(path)
 
         # Store in database
-        import hashlib
-
         with open(path, "rb") as f:
             sha256 = hashlib.sha256(f.read()).hexdigest()
 
