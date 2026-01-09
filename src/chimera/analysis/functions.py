@@ -48,14 +48,6 @@ class Function:
 class FunctionAnalyzer:
     """Detects and analyzes functions in a binary."""
 
-    # ARM64 function prologue patterns
-    PROLOGUE_PATTERNS = [
-        # stp x29, x30, [sp, #-N]!
-        bytes([0xFD, 0x7B]),  # Partial match for stp with x29, x30
-        # sub sp, sp, #N
-        bytes([0xFF]),  # Partial match for sub sp
-    ]
-
     def __init__(self, binary: "MachOBinary", disassembler: "ARM64Disassembler") -> None:
         self.binary = binary
         self.disasm = disassembler
