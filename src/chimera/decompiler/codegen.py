@@ -135,6 +135,8 @@ class CCodeGenerator:
             self._emit_while(block)
         elif block.structure_type == StructureType.DO_WHILE_LOOP:
             self._emit_do_while(block)
+        elif block.structure_type == StructureType.SWITCH:
+            self._emit_switch(block)
         elif block.structure_type == StructureType.SEQUENCE:
             for child in block.children:
                 self._emit_structured(child)
@@ -187,6 +189,29 @@ class CCodeGenerator:
         cond = self._value_to_c(block.condition) if block.condition else "1"
         self._emit(f"}} while ({cond});")
 
+    def _emit_switch(self, block: StructuredBlock) -> None:
+        """Emit switch statement."""
+        index_expr = self._value_to_c(block.condition) if block.condition else "0"
+        self._emit(f"switch ({index_expr}) {{")
+
+        # Emit each case
+        for child in block.children:
+            case_meta = child.metadata
+            if case_meta.get("is_default"):
+                self._emit("default:")
+            else:
+                case_value = case_meta.get("case_value", 0)
+                self._emit(f"case {case_value}:")
+
+            self._indent += 1
+            # Emit case body
+            for case_child in child.children:
+                self._emit_structured(case_child)
+            self._emit("break;")
+            self._indent -= 1
+
+        self._emit("}")
+
     def _emit_basic_blocks(self) -> None:
         """Emit basic blocks as fallback."""
         for block in self.ir_func:
@@ -222,7 +247,7 @@ class CCodeGenerator:
             self._emit_load(insn)
             return
 
-        if insn.opcode in (IROpcode.JUMP, IROpcode.BRANCH):
+        if insn.opcode in (IROpcode.JUMP, IROpcode.BRANCH, IROpcode.SWITCH):
             # Control flow handled by structuring
             return
 

@@ -158,6 +158,10 @@ class ControlFlowStructurer:
             # Conditional branch - structure as if-then-else
             return self._structure_conditional(block, statements, stop_at)
 
+        if terminator.opcode == IROpcode.SWITCH:
+            # Multi-way branch - structure as switch
+            return self._structure_switch(block, statements, stop_at)
+
         # Default: sequence
         return StructuredBlock(
             StructureType.SEQUENCE,
@@ -282,6 +286,118 @@ class ControlFlowStructurer:
             )
 
         return loop_block
+
+    def _structure_switch(
+        self,
+        block: IRBasicBlock,
+        statements: list[IRInstruction],
+        stop_at: set[str],
+    ) -> StructuredBlock:
+        """Structure a switch statement."""
+        terminator = block.terminator
+        if not terminator:
+            return StructuredBlock(
+                StructureType.SEQUENCE,
+                statements=statements,
+                source_block=block.label,
+            )
+
+        # Get switch index value
+        index_val = terminator.operands[0] if terminator.operands else None
+
+        # Get case information from metadata
+        cases = terminator.metadata.get("cases", [])
+        default_addr = terminator.metadata.get("default")
+
+        # Find merge point (common successor of all cases)
+        merge_point = self._find_switch_merge(block.successors)
+        new_stop = stop_at | ({merge_point} if merge_point else set())
+
+        # Structure each case
+        case_blocks: list[StructuredBlock] = []
+        seen_targets: set[str] = set()
+
+        for case_info in cases:
+            target_addr = case_info.get("target", 0)
+            case_value = case_info.get("value", 0)
+            target_label = f"bb_{target_addr:x}"
+
+            # Skip duplicate targets (fall-through cases)
+            if target_label in seen_targets:
+                continue
+            seen_targets.add(target_label)
+
+            if target_label not in stop_at and target_label != merge_point:
+                case_body = self._structure_region(target_label, new_stop)
+                case_block = StructuredBlock(
+                    StructureType.SEQUENCE,
+                    children=[case_body],
+                    metadata={"case_value": case_value},
+                )
+                case_blocks.append(case_block)
+
+        # Add default case if present
+        if default_addr:
+            default_label = f"bb_{default_addr:x}"
+            if default_label not in seen_targets and default_label not in stop_at:
+                default_body = self._structure_region(default_label, new_stop)
+                default_block = StructuredBlock(
+                    StructureType.SEQUENCE,
+                    children=[default_body],
+                    metadata={"is_default": True},
+                )
+                case_blocks.append(default_block)
+
+        switch_block = StructuredBlock(
+            StructureType.SWITCH,
+            condition=index_val,
+            statements=statements,
+            children=case_blocks,
+            source_block=block.label,
+            metadata={
+                "cases": cases,
+                "default": default_addr,
+            },
+        )
+
+        # Continue after merge point
+        if merge_point and merge_point not in stop_at:
+            self._visited.discard(merge_point)
+            continuation = self._structure_region(merge_point, stop_at)
+            return StructuredBlock(
+                StructureType.SEQUENCE,
+                children=[switch_block, continuation],
+            )
+
+        return switch_block
+
+    def _find_switch_merge(self, successors: list[str]) -> str | None:
+        """Find common merge point for switch cases."""
+        if len(successors) < 2:
+            return None
+
+        # Get reachable blocks from each case
+        reachable_sets: list[set[str]] = []
+        for succ in successors:
+            reachable_sets.append(self._get_reachable(succ))
+
+        if not reachable_sets:
+            return None
+
+        # Find common blocks across all cases
+        common = reachable_sets[0].copy()
+        for rs in reachable_sets[1:]:
+            common &= rs
+
+        if not common:
+            return None
+
+        # Return the first common block
+        for label in reachable_sets[0]:
+            if label in common:
+                return label
+
+        return None
 
     def _find_merge_point(self, branch1: str | None, branch2: str | None) -> str | None:
         """Find common merge point of two branches."""

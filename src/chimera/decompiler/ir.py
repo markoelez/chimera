@@ -103,6 +103,7 @@ class IROpcode(IntEnum):
     # Control flow
     JUMP = auto()
     BRANCH = auto()  # Conditional branch
+    SWITCH = auto()  # Multi-way branch (switch statement)
     CALL = auto()
     RETURN = auto()
     NOP = auto()
@@ -191,6 +192,7 @@ class IRInstruction:
         return self.opcode in (
             IROpcode.JUMP,
             IROpcode.BRANCH,
+            IROpcode.SWITCH,
             IROpcode.RETURN,
         )
 

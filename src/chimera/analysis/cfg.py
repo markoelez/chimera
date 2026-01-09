@@ -9,6 +9,7 @@ from chimera.arch.arm64.instructions import ARM64Instruction
 
 if TYPE_CHECKING:
     from chimera.arch.arm64.decoder import ARM64Disassembler
+    from chimera.analysis.switch_table import SwitchTable
 
 
 class EdgeType(IntEnum):
@@ -20,6 +21,7 @@ class EdgeType(IntEnum):
     CONDITIONAL_FALSE = auto()  # Conditional branch not taken
     CALL = auto()  # Function call
     RETURN = auto()  # Function return
+    SWITCH_CASE = auto()  # Switch table case branch
 
 
 @dataclass
@@ -82,6 +84,45 @@ class ControlFlowGraph:
         self.entry_address = entry_address
         self.blocks: dict[int, BasicBlock] = {}
         self.edges: list[CFGEdge] = []
+        self.switches: list[SwitchTable] = []
+
+    def add_switch(self, switch: "SwitchTable") -> None:
+        """Add a switch table and create edges for its cases."""
+        self.switches.append(switch)
+
+        # Find the block containing the dispatch address
+        dispatch_block: BasicBlock | None = None
+        for block in self.blocks.values():
+            if block.address <= switch.dispatch_address < block.end_address:
+                dispatch_block = block
+                break
+
+        if dispatch_block is None:
+            return
+
+        # Add edges for each case target
+        for case in switch.cases:
+            if case.target_address in self.blocks:
+                self.add_edge(
+                    dispatch_block.address,
+                    case.target_address,
+                    EdgeType.SWITCH_CASE,
+                )
+
+        # Add edge for default if present
+        if switch.default_address and switch.default_address in self.blocks:
+            self.add_edge(
+                dispatch_block.address,
+                switch.default_address,
+                EdgeType.SWITCH_CASE,
+            )
+
+    def get_switch_at(self, address: int) -> "SwitchTable | None":
+        """Get switch table by dispatch address."""
+        for switch in self.switches:
+            if switch.dispatch_address == address:
+                return switch
+        return None
 
     def add_block(self, block: BasicBlock) -> None:
         """Add a basic block to the CFG."""

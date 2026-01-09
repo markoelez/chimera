@@ -12,7 +12,7 @@ from chimera.decompiler.ir import (
 )
 
 if TYPE_CHECKING:
-    from chimera.analysis.cfg import BasicBlock
+    from chimera.analysis.cfg import BasicBlock, ControlFlowGraph
     from chimera.analysis.functions import Function
     from chimera.arch.arm64.instructions import Operand, ARM64Instruction
 
@@ -24,6 +24,7 @@ class ARM64Lifter:
         self._registers: dict[str, IRValue] = {}
         self._temp_counter = 0
         self._current_func: IRFunction | None = None
+        self._cfg: ControlFlowGraph | None = None
 
     def lift_function(self, func: "Function") -> IRFunction:
         """Lift a function to IR."""
@@ -35,6 +36,7 @@ class ARM64Lifter:
             source_addr=func.address,
         )
         self._current_func = ir_func
+        self._cfg = func.cfg
         self._registers = {}
         self._temp_counter = 0
 
@@ -115,6 +117,8 @@ class ARM64Lifter:
             return self._lift_return(insn)
         elif mnemonic == "b":
             return self._lift_jump(insn)
+        elif mnemonic == "br":
+            return self._lift_indirect_branch(insn)
         elif mnemonic.startswith("b."):
             return self._lift_cond_branch(insn)
         elif mnemonic in ("cbz", "cbnz"):
@@ -457,6 +461,58 @@ class ARM64Lifter:
                 IROpcode.JUMP,
                 operands=[target],
                 source_addr=insn.address,
+            )
+        ]
+
+    def _lift_indirect_branch(self, insn: "ARM64Instruction") -> list[IRInstruction]:
+        """Lift BR instruction (indirect branch).
+
+        If this is a switch dispatch, emits SWITCH IR with case targets.
+        Otherwise, emits a simple indirect jump.
+        """
+        if not insn.operands:
+            return []
+
+        target_reg = self._get_operand_value(insn, 0)
+
+        # Check if this is a switch dispatch
+        if self._cfg:
+            switch = self._cfg.get_switch_at(insn.address)
+            if switch:
+                # Emit SWITCH IR
+                index_val = self._get_reg(switch.index_register)
+
+                # Build case targets list for metadata
+                case_targets: list[dict[str, int | bool]] = []
+                for case in switch.cases:
+                    case_targets.append(
+                        {
+                            "value": case.value,
+                            "target": case.target_address,
+                            "is_default": case.is_default,
+                        }
+                    )
+
+                return [
+                    IRInstruction(
+                        IROpcode.SWITCH,
+                        operands=[index_val],
+                        source_addr=insn.address,
+                        metadata={
+                            "table_address": switch.table_address,
+                            "cases": case_targets,
+                            "default": switch.default_address,
+                        },
+                    )
+                ]
+
+        # Not a switch - emit indirect jump
+        return [
+            IRInstruction(
+                IROpcode.JUMP,
+                operands=[target_reg],
+                source_addr=insn.address,
+                metadata={"indirect": True},
             )
         ]
 

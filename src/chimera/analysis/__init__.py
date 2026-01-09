@@ -46,6 +46,7 @@ from chimera.analysis.callgraph import (
 )
 from chimera.analysis.functions import Function, FunctionAnalyzer
 from chimera.analysis.stack_frame import StackFrame, StackVariable, StackFrameAnalyzer
+from chimera.analysis.switch_table import SwitchCase, SwitchTable, SwitchDetector
 
 __all__ = [
     "BasicBlock",
@@ -99,4 +100,8 @@ __all__ = [
     "CallGraphBuilder",
     "build_call_graph",
     "StronglyConnectedComponent",
+    # Switch table detection
+    "SwitchCase",
+    "SwitchTable",
+    "SwitchDetector",
 ]

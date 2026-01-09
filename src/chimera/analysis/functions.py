@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from collections.abc import Iterator
 
 from chimera.analysis.cfg import BasicBlock, CFGBuilder, ControlFlowGraph
+from chimera.analysis.switch_table import SwitchDetector
 from chimera.arch.arm64.instructions import ARM64Instruction
 
 if TYPE_CHECKING:
@@ -133,6 +134,12 @@ class FunctionAnalyzer:
         offset = func.address - text.address
         data = text.data[offset : offset + func.size]
         func.cfg = self.cfg_builder.build(data, func.address, end)
+
+        # Detect switch tables and add to CFG
+        if func.cfg:
+            switch_detector = SwitchDetector(self.binary, func.cfg)
+            for switch in switch_detector.detect_all():
+                func.cfg.add_switch(switch)
 
         # Check if leaf function
         func.is_leaf = self._is_leaf_function(func)
