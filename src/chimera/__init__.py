@@ -10,6 +10,7 @@ from chimera.analysis import (
     XRef,
     Function,
     XRefType,
+    CallGraph,
     ObjCClass,
     BasicBlock,
     DiffResult,
@@ -26,6 +27,7 @@ from chimera.analysis import (
     ControlFlowGraph,
     FunctionAnalyzer,
     BinaryDiffAnalyzer,
+    build_call_graph,
 )
 from chimera.decompiler.codegen import decompile_function
 
@@ -40,6 +42,7 @@ __all__ = [
     "ControlFlowGraph",
     "XRef",
     "XRefType",
+    "CallGraph",
     "Symbol",
     "SymbolType",
     "Segment",
@@ -65,6 +68,7 @@ class Project:
         self._functions: dict[int, Function] = {}
         self._xrefs: XRefManager | None = None
         self._objc: ObjCMetadata | None = None
+        self._call_graph: CallGraph | None = None
         self._analyzed = False
 
         if binary_path:
@@ -271,6 +275,13 @@ class Project:
     def objc(self) -> ObjCMetadata | None:
         """Get Objective-C metadata (requires analyze() first)."""
         return self._objc
+
+    @property
+    def call_graph(self) -> CallGraph | None:
+        """Get call graph (built lazily on first access after analyze())."""
+        if self._call_graph is None and self._xrefs is not None:
+            self._call_graph = build_call_graph(self._functions, self._xrefs)
+        return self._call_graph
 
     def get_objc_class(self, name: str) -> ObjCClass | None:
         """Get Objective-C class by name."""

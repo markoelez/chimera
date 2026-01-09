@@ -35,6 +35,15 @@ from chimera.analysis.search import (
 )
 from chimera.analysis.dataflow import DataFlowAnalyzer, ReachingDefinitions
 from chimera.analysis.arguments import ArgumentInfo, ArgumentAnalyzer
+from chimera.analysis.callgraph import (
+    CallEdge,
+    CallType,
+    CallGraph,
+    CallGraphNode,
+    CallGraphBuilder,
+    StronglyConnectedComponent,
+    build_call_graph,
+)
 from chimera.analysis.functions import Function, FunctionAnalyzer
 from chimera.analysis.stack_frame import StackFrame, StackVariable, StackFrameAnalyzer
 
@@ -82,4 +91,12 @@ __all__ = [
     # Argument detection
     "ArgumentInfo",
     "ArgumentAnalyzer",
+    # Call graph analysis
+    "CallType",
+    "CallEdge",
+    "CallGraph",
+    "CallGraphNode",
+    "CallGraphBuilder",
+    "build_call_graph",
+    "StronglyConnectedComponent",
 ]

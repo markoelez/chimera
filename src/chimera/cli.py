@@ -945,6 +945,276 @@ def patch_analysis_cmd(primary: str, secondary: str, verbose: bool) -> None:
     proj2.close()
 
 
+@main.command("callgraph")
+@click.argument("binary", type=click.Path(exists=True))
+@click.option("--roots", is_flag=True, help="Show root functions (not called by others)")
+@click.option("--leaves", is_flag=True, help="Show leaf functions (don't call anything)")
+@click.option("--recursive", is_flag=True, help="Show recursive functions")
+@click.option("--function", "func_addr", default=None, help="Show callers/callees of function")
+@click.option("--path", "path_pair", nargs=2, default=None, help="Find call path FROM TO")
+@click.option("--depth", is_flag=True, help="Show call depth for each function")
+@click.option("--stats", is_flag=True, help="Show call graph statistics")
+@click.option("--dot", is_flag=True, help="Output DOT format for Graphviz")
+@click.option("--limit", default=50, help="Maximum results to show")
+def callgraph_cmd(
+    binary: str,
+    roots: bool,
+    leaves: bool,
+    recursive: bool,
+    func_addr: str | None,
+    path_pair: tuple[str, str] | None,
+    depth: bool,
+    stats: bool,
+    dot: bool,
+    limit: int,
+) -> None:
+    """Analyze function call graph.
+
+    Shows inter-procedural call relationships between functions.
+    """
+    from chimera import Project
+
+    with Project.load(binary) as proj:
+        proj.analyze()
+
+        cg = proj.call_graph
+        if cg is None or len(cg) == 0:
+            console.print("[dim]No call graph available[/dim]")
+            return
+
+        if dot:
+            # Output DOT format
+            console.print(cg.to_dot())
+            return
+
+        if stats:
+            # Show statistics
+            cg.compute_depths()
+            recursive_funcs = cg.recursive_functions()
+            root_funcs = cg.root_functions()
+            leaf_funcs = cg.leaf_functions()
+            max_depth = max((n.depth for n in cg.nodes.values() if n.depth >= 0), default=0)
+
+            console.print(
+                Panel.fit(
+                    f"Total functions: [bold]{len(cg.nodes)}[/bold]\n"
+                    f"Total call edges: [bold]{len(cg.edges)}[/bold]\n"
+                    f"Root functions: [bold]{len(root_funcs)}[/bold]\n"
+                    f"Leaf functions: [bold]{len(leaf_funcs)}[/bold]\n"
+                    f"Recursive functions: [bold]{len(recursive_funcs)}[/bold]\n"
+                    f"Max call depth: [bold]{max_depth}[/bold]",
+                    title="Call Graph Statistics",
+                )
+            )
+            return
+
+        if func_addr:
+            # Show callers/callees of a specific function
+            try:
+                addr = int(func_addr, 0)
+            except ValueError:
+                # Try to find by name
+                func = proj.get_function_by_name(func_addr)
+                if not func:
+                    console.print(f"[red]Function not found: {func_addr}[/red]")
+                    return
+                addr = func.address
+
+            if addr not in cg.nodes:
+                console.print(f"[red]Function not in call graph: {addr:#x}[/red]")
+                return
+
+            node = cg.nodes[addr]
+            func = proj.get_function(addr)
+            func_name = func.name if func else node.name
+
+            console.print(f"\n[bold]Function: {func_name}[/bold] @ {addr:#x}")
+            console.print(f"Depth: {node.depth}")
+            console.print(f"Recursive: {'Yes' if node.is_recursive else 'No'}")
+
+            if node.callers:
+                console.print("\n[bold]Called by:[/bold]")
+                for caller_addr in sorted(node.callers):
+                    caller_func = proj.get_function(caller_addr)
+                    caller_name = caller_func.name if caller_func else f"sub_{caller_addr:x}"
+                    console.print(f"  {caller_addr:#x}  {caller_name}")
+
+            if node.callees:
+                console.print("\n[bold]Calls:[/bold]")
+                for callee_addr in sorted(node.callees):
+                    callee_func = proj.get_function(callee_addr)
+                    callee_name = callee_func.name if callee_func else f"sub_{callee_addr:x}"
+                    console.print(f"  {callee_addr:#x}  {callee_name}")
+
+            return
+
+        if path_pair:
+            # Find path between two functions
+            from_str, to_str = path_pair
+
+            # Parse from address
+            try:
+                from_addr = int(from_str, 0)
+            except ValueError:
+                func = proj.get_function_by_name(from_str)
+                if not func:
+                    console.print(f"[red]Function not found: {from_str}[/red]")
+                    return
+                from_addr = func.address
+
+            # Parse to address
+            try:
+                to_addr = int(to_str, 0)
+            except ValueError:
+                func = proj.get_function_by_name(to_str)
+                if not func:
+                    console.print(f"[red]Function not found: {to_str}[/red]")
+                    return
+                to_addr = func.address
+
+            path = cg.shortest_path(from_addr, to_addr)
+            if path:
+                console.print(f"\n[bold]Call path ({len(path)} hops):[/bold]\n")
+                for i, addr in enumerate(path):
+                    func = proj.get_function(addr)
+                    name = func.name if func else f"sub_{addr:x}"
+                    prefix = "  " if i == 0 else "  -> "
+                    console.print(f"{prefix}[cyan]{name}[/cyan] @ {addr:#x}")
+            else:
+                console.print("[dim]No call path found between these functions[/dim]")
+            return
+
+        if roots:
+            # Show root functions
+            root_addrs = cg.root_functions()
+            console.print(f"\n[bold]Root Functions ({len(root_addrs)} found):[/bold]\n")
+
+            table = Table()
+            table.add_column("Address", style="green")
+            table.add_column("Name", style="cyan")
+            table.add_column("Callees", justify="right")
+
+            for addr in sorted(root_addrs)[:limit]:
+                func = proj.get_function(addr)
+                name = func.name if func else f"sub_{addr:x}"
+                callees = len(cg.nodes[addr].callees) if addr in cg.nodes else 0
+                table.add_row(f"{addr:#x}", name, str(callees))
+
+            console.print(table)
+            if len(root_addrs) > limit:
+                console.print(
+                    f"\n[dim]Showing {limit} of {len(root_addrs)}. Use --limit to see more.[/dim]"
+                )
+            return
+
+        if leaves:
+            # Show leaf functions
+            leaf_addrs = cg.leaf_functions()
+            console.print(f"\n[bold]Leaf Functions ({len(leaf_addrs)} found):[/bold]\n")
+
+            table = Table()
+            table.add_column("Address", style="green")
+            table.add_column("Name", style="cyan")
+            table.add_column("Callers", justify="right")
+
+            for addr in sorted(leaf_addrs)[:limit]:
+                func = proj.get_function(addr)
+                name = func.name if func else f"sub_{addr:x}"
+                callers = len(cg.nodes[addr].callers) if addr in cg.nodes else 0
+                table.add_row(f"{addr:#x}", name, str(callers))
+
+            console.print(table)
+            if len(leaf_addrs) > limit:
+                console.print(
+                    f"\n[dim]Showing {limit} of {len(leaf_addrs)}. Use --limit to see more.[/dim]"
+                )
+            return
+
+        if recursive:
+            # Show recursive functions
+            recursive_addrs = cg.recursive_functions()
+            if not recursive_addrs:
+                console.print("[dim]No recursive functions found[/dim]")
+                return
+
+            console.print(f"\n[bold]Recursive Functions ({len(recursive_addrs)} found):[/bold]\n")
+
+            table = Table()
+            table.add_column("Address", style="green")
+            table.add_column("Name", style="cyan")
+            table.add_column("Type")
+
+            for addr in sorted(recursive_addrs)[:limit]:
+                func = proj.get_function(addr)
+                name = func.name if func else f"sub_{addr:x}"
+                # Check if self-recursive or mutually recursive
+                is_self = addr in cg.nodes[addr].callees
+                rec_type = "self" if is_self else "mutual"
+                table.add_row(f"{addr:#x}", name, rec_type)
+
+            console.print(table)
+            if len(recursive_addrs) > limit:
+                console.print(
+                    f"\n[dim]Showing {limit} of {len(recursive_addrs)}. Use --limit to see more.[/dim]"
+                )
+            return
+
+        if depth:
+            # Show all functions with their depth
+            cg.compute_depths()
+            console.print("\n[bold]Functions by Call Depth:[/bold]\n")
+
+            table = Table()
+            table.add_column("Depth", justify="right")
+            table.add_column("Address", style="green")
+            table.add_column("Name", style="cyan")
+            table.add_column("Callers", justify="right")
+            table.add_column("Callees", justify="right")
+
+            sorted_nodes = sorted(cg.nodes.values(), key=lambda n: (n.depth, n.address))
+            for node in sorted_nodes[:limit]:
+                func = proj.get_function(node.address)
+                name = func.name if func else node.name
+                depth_str = str(node.depth) if node.depth >= 0 else "?"
+                table.add_row(
+                    depth_str,
+                    f"{node.address:#x}",
+                    name,
+                    str(len(node.callers)),
+                    str(len(node.callees)),
+                )
+
+            console.print(table)
+            if len(cg.nodes) > limit:
+                console.print(
+                    f"\n[dim]Showing {limit} of {len(cg.nodes)}. Use --limit to see more.[/dim]"
+                )
+            return
+
+        # Default: show stats
+        cg.compute_depths()
+        recursive_funcs = cg.recursive_functions()
+        root_funcs = cg.root_functions()
+        leaf_funcs = cg.leaf_functions()
+        max_depth = max((n.depth for n in cg.nodes.values() if n.depth >= 0), default=0)
+
+        console.print(
+            Panel.fit(
+                f"Total functions: [bold]{len(cg.nodes)}[/bold]\n"
+                f"Total call edges: [bold]{len(cg.edges)}[/bold]\n"
+                f"Root functions: [bold]{len(root_funcs)}[/bold]\n"
+                f"Leaf functions: [bold]{len(leaf_funcs)}[/bold]\n"
+                f"Recursive functions: [bold]{len(recursive_funcs)}[/bold]\n"
+                f"Max call depth: [bold]{max_depth}[/bold]",
+                title="Call Graph Statistics",
+            )
+        )
+
+        console.print(
+            "\n[dim]Use --roots, --leaves, --recursive, --function, --path, or --dot for more details.[/dim]"
+        )
+
+
 @main.command("interactive")
 @click.argument("binary", type=click.Path(exists=True))
 def interactive_mode(binary: str) -> None:
