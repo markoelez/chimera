@@ -13,7 +13,6 @@ if TYPE_CHECKING:
 # Objective-C class flags
 RO_META = 1 << 0
 RO_ROOT = 1 << 1
-RO_HAS_CXX_STRUCTORS = 1 << 2
 
 # Mask to extract class_ro_t pointer from data field
 FAST_DATA_MASK = 0x00007FFFFFFFFFF8
