@@ -274,17 +274,18 @@ class ObjCAnalyzer:
 
     def _read_u32(self, addr: int) -> int:
         """Read 32-bit unsigned int at address."""
-        try:
-            data = self.binary.read(addr, 4)
-            return struct.unpack("<I", data)[0]
-        except (ValueError, struct.error):
-            return 0
+        return self._read_int(addr, "<I")
 
     def _read_i32(self, addr: int) -> int:
         """Read 32-bit signed int at address."""
+        return self._read_int(addr, "<i")
+
+    def _read_int(self, addr: int, fmt: str) -> int:
+        """Read integer at address with given struct format."""
         try:
-            data = self.binary.read(addr, 4)
-            return struct.unpack("<i", data)[0]
+            size = struct.calcsize(fmt)
+            data = self.binary.read(addr, size)
+            return struct.unpack(fmt, data)[0]
         except (ValueError, struct.error):
             return 0
 
@@ -308,20 +309,22 @@ class ObjCAnalyzer:
         except ValueError:
             return ""
 
-    def _parse_classlist(self) -> None:
-        """Parse __objc_classlist section."""
-        section = self._get_section("__objc_classlist")
+    def _iter_section_ptrs(self, section_name: str) -> Iterator[int]:
+        """Iterate decoded pointers from a section."""
+        section = self._get_section(section_name)
         if not section:
             return
-
-        # Read array of class pointers from section data directly
-        # These may be chained fixup encoded pointers
-        num_classes = section.size // 8
-        for i in range(num_classes):
+        for i in range(section.size // 8):
             offset = i * 8
-            raw_ptr = struct.unpack("<Q", section.data[offset : offset + 8])[0]
-            class_ptr = self._decode_ptr(raw_ptr)
-            if class_ptr and class_ptr not in self._parsed_classes:
+            raw = struct.unpack("<Q", section.data[offset : offset + 8])[0]
+            ptr = self._decode_ptr(raw)
+            if ptr:
+                yield ptr
+
+    def _parse_classlist(self) -> None:
+        """Parse __objc_classlist section."""
+        for class_ptr in self._iter_section_ptrs("__objc_classlist"):
+            if class_ptr not in self._parsed_classes:
                 self._parse_class(class_ptr)
 
     def _parse_class(self, addr: int) -> ObjCClass | None:
@@ -667,17 +670,8 @@ class ObjCAnalyzer:
 
     def _parse_catlist(self) -> None:
         """Parse __objc_catlist section for categories."""
-        section = self._get_section("__objc_catlist")
-        if not section:
-            return
-
-        num_cats = section.size // 8
-        for i in range(num_cats):
-            offset = i * 8
-            raw_ptr = struct.unpack("<Q", section.data[offset : offset + 8])[0]
-            cat_ptr = self._decode_ptr(raw_ptr)
-            if cat_ptr:
-                self._parse_category(cat_ptr)
+        for cat_ptr in self._iter_section_ptrs("__objc_catlist"):
+            self._parse_category(cat_ptr)
 
     def _parse_category(self, addr: int) -> ObjCCategory | None:
         """Parse a category structure."""
@@ -717,23 +711,12 @@ class ObjCAnalyzer:
                 except ValueError:
                     pass
 
-        instance_methods = (
-            tuple(self._parse_method_list(instance_methods_ptr, is_class_method=False))
-            if instance_methods_ptr
-            else ()
-        )
-        class_methods = (
-            tuple(self._parse_method_list(class_methods_ptr, is_class_method=True))
-            if class_methods_ptr
-            else ()
-        )
-
         category = ObjCCategory(
             address=addr,
             name=name,
             class_name=class_name,
-            instance_methods=instance_methods,
-            class_methods=class_methods,
+            instance_methods=tuple(self._parse_method_list(instance_methods_ptr, False)),
+            class_methods=tuple(self._parse_method_list(class_methods_ptr, True)),
         )
 
         self.metadata.add_category(category)
@@ -741,17 +724,8 @@ class ObjCAnalyzer:
 
     def _parse_protolist(self) -> None:
         """Parse __objc_protolist section for protocols."""
-        section = self._get_section("__objc_protolist")
-        if not section:
-            return
-
-        num_protos = section.size // 8
-        for i in range(num_protos):
-            offset = i * 8
-            raw_ptr = struct.unpack("<Q", section.data[offset : offset + 8])[0]
-            proto_ptr = self._decode_ptr(raw_ptr)
-            if proto_ptr:
-                self._parse_protocol(proto_ptr)
+        for proto_ptr in self._iter_section_ptrs("__objc_protolist"):
+            self._parse_protocol(proto_ptr)
 
     def _parse_protocol(self, addr: int) -> ObjCProtocol | None:
         """Parse a protocol structure."""
@@ -777,26 +751,13 @@ class ObjCAnalyzer:
         if not name:
             return None
 
-        instance_methods = (
-            tuple(self._parse_method_list(instance_methods_ptr, is_class_method=False))
-            if instance_methods_ptr
-            else ()
-        )
-        class_methods = (
-            tuple(self._parse_method_list(class_methods_ptr, is_class_method=True))
-            if class_methods_ptr
-            else ()
-        )
-        properties = tuple(self._parse_property_list(properties_ptr)) if properties_ptr else ()
-
         protocol = ObjCProtocol(
             address=addr,
             name=name,
-            instance_methods=instance_methods,
-            class_methods=class_methods,
-            properties=properties,
+            instance_methods=tuple(self._parse_method_list(instance_methods_ptr, False)),
+            class_methods=tuple(self._parse_method_list(class_methods_ptr, True)),
+            properties=tuple(self._parse_property_list(properties_ptr)),
         )
-
         self.metadata.add_protocol(protocol)
         return protocol
 
@@ -805,14 +766,11 @@ class ObjCAnalyzer:
         section = self._get_section("__objc_selrefs")
         if not section:
             return
-
-        num_refs = section.size // 8
-        for i in range(num_refs):
+        for i in range(section.size // 8):
             offset = i * 8
-            addr = section.address + offset
-            raw_ptr = struct.unpack("<Q", section.data[offset : offset + 8])[0]
-            sel_ptr = self._decode_ptr(raw_ptr)
+            raw = struct.unpack("<Q", section.data[offset : offset + 8])[0]
+            sel_ptr = self._decode_ptr(raw)
             if sel_ptr:
                 name = self._read_string(sel_ptr)
                 if name:
-                    self.metadata.add_selector(addr, name)
+                    self.metadata.add_selector(section.address + offset, name)
