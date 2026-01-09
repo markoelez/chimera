@@ -9,7 +9,6 @@ if TYPE_CHECKING:
     from chimera.loader.macho import MachOBinary
     from chimera.loader.segments import Section
     from chimera.arch.arm64.decoder import ARM64Disassembler
-    from chimera.arch.arm64.instructions import ARM64Instruction
 
 
 class XRefType(IntEnum):
@@ -151,33 +150,6 @@ class XRefAnalyzer:
                         target = insn.operands[1].value
                         if isinstance(target, int):
                             self.xrefs.add_xref(insn.address, target, XRefType.DATA_REF)
-
-            # Load instructions with PC-relative addressing
-            elif insn.is_load:
-                self._handle_memory_ref(insn, XRefType.DATA_READ)
-
-            # Store instructions
-            elif insn.is_store:
-                self._handle_memory_ref(insn, XRefType.DATA_WRITE)
-
-    def _handle_memory_ref(
-        self,
-        insn: "ARM64Instruction",
-        xref_type: XRefType,  # type: ignore
-    ) -> None:
-        """Handle memory reference instructions."""
-
-        # Look for literal pool loads (ldr x0, =label)
-        if insn.mnemonic.startswith("ldr") and "=" in insn.op_str:
-            # This is a pseudo-instruction for literal pool
-            pass
-
-        # Check operands for memory references
-        for op in insn.operands:
-            if op.is_memory:
-                # If we can resolve the address, add xref
-                # This requires more context (register values)
-                pass
 
     def _analyze_data_xrefs(self) -> None:
         """Extract pointer cross-references from data sections."""

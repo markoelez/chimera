@@ -1,6 +1,5 @@
 """Chimera - A reverse engineering framework for ARM64 macOS binaries."""
 
-from typing import TYPE_CHECKING
 from pathlib import Path
 from collections.abc import Iterator
 
@@ -29,9 +28,6 @@ from chimera.analysis import (
     BinaryDiffAnalyzer,
 )
 from chimera.decompiler.codegen import decompile_function
-
-if TYPE_CHECKING:
-    pass
 
 __version__ = "0.1.0"
 __all__ = [
