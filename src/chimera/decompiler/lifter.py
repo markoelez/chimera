@@ -209,135 +209,57 @@ class ARM64Lifter:
             IRInstruction(IROpcode.OR, dest=dest, operands=[dest, imm], source_addr=insn.address)
         ]
 
-    def _lift_add(self, insn: "ARM64Instruction") -> list[IRInstruction]:
-        """Lift ADD instruction."""
+    def _lift_binary_op(self, insn: "ARM64Instruction", opcode: IROpcode) -> list[IRInstruction]:
+        """Lift a binary operation instruction."""
         if len(insn.operands) < 3:
             return []
 
         dest = self._get_operand_value(insn, 0)
         op1 = self._get_operand_value(insn, 1)
         op2 = self._get_operand_value(insn, 2)
-
-        return [
-            IRInstruction(IROpcode.ADD, dest=dest, operands=[op1, op2], source_addr=insn.address)
-        ]
-
-    def _lift_sub(self, insn: "ARM64Instruction") -> list[IRInstruction]:
-        """Lift SUB instruction."""
-        if len(insn.operands) < 3:
-            return []
-
-        dest = self._get_operand_value(insn, 0)
-        op1 = self._get_operand_value(insn, 1)
-        op2 = self._get_operand_value(insn, 2)
-
-        return [
-            IRInstruction(IROpcode.SUB, dest=dest, operands=[op1, op2], source_addr=insn.address)
-        ]
-
-    def _lift_mul(self, insn: "ARM64Instruction") -> list[IRInstruction]:
-        """Lift MUL instruction."""
-        if len(insn.operands) < 3:
-            return []
-
-        dest = self._get_operand_value(insn, 0)
-        op1 = self._get_operand_value(insn, 1)
-        op2 = self._get_operand_value(insn, 2)
-
-        return [
-            IRInstruction(IROpcode.MUL, dest=dest, operands=[op1, op2], source_addr=insn.address)
-        ]
-
-    def _lift_div(self, insn: "ARM64Instruction") -> list[IRInstruction]:
-        """Lift DIV instruction."""
-        if len(insn.operands) < 3:
-            return []
-
-        dest = self._get_operand_value(insn, 0)
-        op1 = self._get_operand_value(insn, 1)
-        op2 = self._get_operand_value(insn, 2)
-
-        opcode = IROpcode.UDIV if insn.mnemonic.lower() == "udiv" else IROpcode.DIV
 
         return [IRInstruction(opcode, dest=dest, operands=[op1, op2], source_addr=insn.address)]
 
+    def _lift_add(self, insn: "ARM64Instruction") -> list[IRInstruction]:
+        """Lift ADD instruction."""
+        return self._lift_binary_op(insn, IROpcode.ADD)
+
+    def _lift_sub(self, insn: "ARM64Instruction") -> list[IRInstruction]:
+        """Lift SUB instruction."""
+        return self._lift_binary_op(insn, IROpcode.SUB)
+
+    def _lift_mul(self, insn: "ARM64Instruction") -> list[IRInstruction]:
+        """Lift MUL instruction."""
+        return self._lift_binary_op(insn, IROpcode.MUL)
+
+    def _lift_div(self, insn: "ARM64Instruction") -> list[IRInstruction]:
+        """Lift DIV instruction."""
+        opcode = IROpcode.UDIV if insn.mnemonic.lower() == "udiv" else IROpcode.DIV
+        return self._lift_binary_op(insn, opcode)
+
     def _lift_and(self, insn: "ARM64Instruction") -> list[IRInstruction]:
         """Lift AND instruction."""
-        if len(insn.operands) < 3:
-            return []
-
-        dest = self._get_operand_value(insn, 0)
-        op1 = self._get_operand_value(insn, 1)
-        op2 = self._get_operand_value(insn, 2)
-
-        return [
-            IRInstruction(IROpcode.AND, dest=dest, operands=[op1, op2], source_addr=insn.address)
-        ]
+        return self._lift_binary_op(insn, IROpcode.AND)
 
     def _lift_or(self, insn: "ARM64Instruction") -> list[IRInstruction]:
         """Lift ORR instruction."""
-        if len(insn.operands) < 3:
-            return []
-
-        dest = self._get_operand_value(insn, 0)
-        op1 = self._get_operand_value(insn, 1)
-        op2 = self._get_operand_value(insn, 2)
-
-        return [
-            IRInstruction(IROpcode.OR, dest=dest, operands=[op1, op2], source_addr=insn.address)
-        ]
+        return self._lift_binary_op(insn, IROpcode.OR)
 
     def _lift_xor(self, insn: "ARM64Instruction") -> list[IRInstruction]:
         """Lift EOR instruction."""
-        if len(insn.operands) < 3:
-            return []
-
-        dest = self._get_operand_value(insn, 0)
-        op1 = self._get_operand_value(insn, 1)
-        op2 = self._get_operand_value(insn, 2)
-
-        return [
-            IRInstruction(IROpcode.XOR, dest=dest, operands=[op1, op2], source_addr=insn.address)
-        ]
+        return self._lift_binary_op(insn, IROpcode.XOR)
 
     def _lift_shl(self, insn: "ARM64Instruction") -> list[IRInstruction]:
         """Lift LSL instruction."""
-        if len(insn.operands) < 3:
-            return []
-
-        dest = self._get_operand_value(insn, 0)
-        op1 = self._get_operand_value(insn, 1)
-        op2 = self._get_operand_value(insn, 2)
-
-        return [
-            IRInstruction(IROpcode.SHL, dest=dest, operands=[op1, op2], source_addr=insn.address)
-        ]
+        return self._lift_binary_op(insn, IROpcode.SHL)
 
     def _lift_shr(self, insn: "ARM64Instruction") -> list[IRInstruction]:
         """Lift LSR instruction."""
-        if len(insn.operands) < 3:
-            return []
-
-        dest = self._get_operand_value(insn, 0)
-        op1 = self._get_operand_value(insn, 1)
-        op2 = self._get_operand_value(insn, 2)
-
-        return [
-            IRInstruction(IROpcode.SHR, dest=dest, operands=[op1, op2], source_addr=insn.address)
-        ]
+        return self._lift_binary_op(insn, IROpcode.SHR)
 
     def _lift_sar(self, insn: "ARM64Instruction") -> list[IRInstruction]:
         """Lift ASR instruction."""
-        if len(insn.operands) < 3:
-            return []
-
-        dest = self._get_operand_value(insn, 0)
-        op1 = self._get_operand_value(insn, 1)
-        op2 = self._get_operand_value(insn, 2)
-
-        return [
-            IRInstruction(IROpcode.SAR, dest=dest, operands=[op1, op2], source_addr=insn.address)
-        ]
+        return self._lift_binary_op(insn, IROpcode.SAR)
 
     def _lift_load(self, insn: "ARM64Instruction") -> list[IRInstruction]:
         """Lift LDR instruction."""

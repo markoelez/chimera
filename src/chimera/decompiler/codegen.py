@@ -126,17 +126,18 @@ class CCodeGenerator:
         for stmt in block.statements:
             self._emit_statement(stmt)
 
-        # Emit based on structure type
-        if block.structure_type == StructureType.IF_THEN:
-            self._emit_if_then(block)
-        elif block.structure_type == StructureType.IF_THEN_ELSE:
-            self._emit_if_else(block)
-        elif block.structure_type == StructureType.WHILE_LOOP:
-            self._emit_while(block)
-        elif block.structure_type == StructureType.DO_WHILE_LOOP:
-            self._emit_do_while(block)
-        elif block.structure_type == StructureType.SWITCH:
-            self._emit_switch(block)
+        # Dispatch to structure-specific emitters
+        emitters = {
+            StructureType.IF_THEN: self._emit_if_then,
+            StructureType.IF_THEN_ELSE: self._emit_if_else,
+            StructureType.WHILE_LOOP: self._emit_while,
+            StructureType.DO_WHILE_LOOP: self._emit_do_while,
+            StructureType.SWITCH: self._emit_switch,
+        }
+
+        emitter = emitters.get(block.structure_type)
+        if emitter:
+            emitter(block)
         elif block.structure_type == StructureType.SEQUENCE:
             for child in block.children:
                 self._emit_structured(child)
@@ -222,11 +223,13 @@ class CCodeGenerator:
 
     def _emit_statement(self, insn: IRInstruction) -> None:
         """Emit a single statement."""
+        # Handle NOP with optional comment
         if insn.opcode == IROpcode.NOP:
             if "unknown" in insn.metadata:
                 self._emit(f"// {insn.metadata['unknown']}")
             return
 
+        # Handle return statements
         if insn.opcode == IROpcode.RETURN:
             if insn.operands:
                 val = self._value_to_c(insn.operands[0])
@@ -235,22 +238,23 @@ class CCodeGenerator:
                 self._emit("return;")
             return
 
-        if insn.opcode == IROpcode.CALL:
-            self._emit_call(insn)
+        # Dispatch to specific emitters for complex operations
+        special_emitters = {
+            IROpcode.CALL: self._emit_call,
+            IROpcode.STORE: self._emit_store,
+            IROpcode.LOAD: self._emit_load,
+        }
+
+        emitter = special_emitters.get(insn.opcode)
+        if emitter:
+            emitter(insn)
             return
 
-        if insn.opcode == IROpcode.STORE:
-            self._emit_store(insn)
-            return
-
-        if insn.opcode == IROpcode.LOAD:
-            self._emit_load(insn)
-            return
-
+        # Control flow is handled by structuring, skip here
         if insn.opcode in (IROpcode.JUMP, IROpcode.BRANCH, IROpcode.SWITCH):
-            # Control flow handled by structuring
             return
 
+        # General assignment statement
         if insn.dest:
             dest = self._get_var_name(insn.dest)
             expr = self._insn_to_expr(insn)
