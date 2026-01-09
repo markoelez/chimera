@@ -608,6 +608,343 @@ def objc_cmd(
             console.print(table)
 
 
+@main.command("diff")
+@click.argument("primary", type=click.Path(exists=True))
+@click.argument("secondary", type=click.Path(exists=True))
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+@click.option("-t", "--threshold", default=0.5, help="Minimum similarity threshold (0.0-1.0)")
+@click.option("-v", "--verbose", is_flag=True, help="Show detailed output")
+def diff_cmd(
+    primary: str,
+    secondary: str,
+    as_json: bool,
+    threshold: float,
+    verbose: bool,
+) -> None:
+    """Compare two binaries and show differences.
+
+    Performs BinDiff-style analysis to match functions between two binary
+    versions and identify what has changed.
+    """
+    import json as json_mod
+
+    from chimera import Project
+
+    console.print("Comparing binaries...")
+    console.print(f"  Primary:   {primary}")
+    console.print(f"  Secondary: {secondary}\n")
+
+    proj1 = Project.load(primary)
+    proj2 = Project.load(secondary)
+    proj1.analyze()
+    proj2.analyze()
+
+    result = proj1.diff(proj2)
+
+    if as_json:
+        # JSON output
+        data = {
+            "primary": result.primary_path,
+            "secondary": result.secondary_path,
+            "primary_sha256": result.primary_sha256,
+            "secondary_sha256": result.secondary_sha256,
+            "similarity": result.similarity,
+            "matched": result.matched_count,
+            "identical": result.identical_count,
+            "modified": result.modified_count,
+            "added": result.added_count,
+            "removed": result.removed_count,
+            "matched_functions": [
+                {
+                    "primary_name": m.primary.name,
+                    "primary_addr": f"{m.primary.address:#x}",
+                    "secondary_name": m.secondary.name,
+                    "secondary_addr": f"{m.secondary.address:#x}",
+                    "similarity": m.similarity,
+                    "strategy": m.strategy.name,
+                }
+                for m in result.matched_functions
+            ],
+            "added_functions": [
+                {"name": u.function.name, "addr": f"{u.function.address:#x}"}
+                for u in result.unmatched_secondary
+            ],
+            "removed_functions": [
+                {"name": u.function.name, "addr": f"{u.function.address:#x}"}
+                for u in result.unmatched_primary
+            ],
+        }
+        console.print(json_mod.dumps(data, indent=2))
+        proj1.close()
+        proj2.close()
+        return
+
+    # Summary panel
+    summary = Panel.fit(
+        f"Similarity: [bold]{result.similarity:.1%}[/bold]\n\n"
+        f"Matched:   {result.matched_count}\n"
+        f"Identical: {result.identical_count}\n"
+        f"Modified:  {result.modified_count}\n"
+        f"Added:     {result.added_count}\n"
+        f"Removed:   {result.removed_count}",
+        title="Diff Summary",
+    )
+    console.print(summary)
+
+    # Modified functions
+    modified = result.get_modified(min_similarity=threshold)
+    if modified:
+        console.print("\n[bold]Modified Functions:[/bold]")
+        table = Table()
+        table.add_column("Primary", style="cyan")
+        table.add_column("Secondary", style="cyan")
+        table.add_column("Similarity")
+        table.add_column("Strategy")
+
+        for match in sorted(modified, key=lambda m: m.similarity):
+            sim_color = (
+                "green" if match.similarity > 0.8 else "yellow" if match.similarity > 0.6 else "red"
+            )
+            table.add_row(
+                match.primary.name,
+                match.secondary.name if match.secondary.name != match.primary.name else "",
+                f"[{sim_color}]{match.similarity:.1%}[/{sim_color}]",
+                match.strategy.name,
+            )
+
+        console.print(table)
+
+    # Added functions
+    if result.unmatched_secondary and verbose:
+        console.print("\n[bold green]Added Functions:[/bold green]")
+        for u in result.unmatched_secondary[:20]:
+            console.print(f"  + {u.function.name} @ {u.function.address:#x}")
+        if len(result.unmatched_secondary) > 20:
+            console.print(f"  ... and {len(result.unmatched_secondary) - 20} more")
+
+    # Removed functions
+    if result.unmatched_primary and verbose:
+        console.print("\n[bold red]Removed Functions:[/bold red]")
+        for u in result.unmatched_primary[:20]:
+            console.print(f"  - {u.function.name} @ {u.function.address:#x}")
+        if len(result.unmatched_primary) > 20:
+            console.print(f"  ... and {len(result.unmatched_primary) - 20} more")
+
+    proj1.close()
+    proj2.close()
+
+
+@main.command("diff-func")
+@click.argument("primary", type=click.Path(exists=True))
+@click.argument("secondary", type=click.Path(exists=True))
+@click.argument("function_name")
+def diff_func_cmd(primary: str, secondary: str, function_name: str) -> None:
+    """Show detailed diff for a specific function.
+
+    Compares a function between two binary versions and shows basic block
+    level changes.
+    """
+    from chimera import Project
+    from chimera.analysis.diff import BinaryDiffAnalyzer
+
+    console.print(f"Comparing function: [bold]{function_name}[/bold]\n")
+
+    proj1 = Project.load(primary)
+    proj2 = Project.load(secondary)
+    proj1.analyze()
+    proj2.analyze()
+
+    analyzer = BinaryDiffAnalyzer(proj1, proj2)
+    result = analyzer.analyze()
+
+    # Find the match for this function
+    match = None
+    for m in result.matched_functions:
+        if m.primary.name == function_name or m.secondary.name == function_name:
+            match = m
+            break
+
+    if not match:
+        # Check if it was added or removed
+        for u in result.unmatched_primary:
+            if u.function.name == function_name:
+                console.print(
+                    f"[red]Function '{function_name}' was removed in secondary binary[/red]"
+                )
+                proj1.close()
+                proj2.close()
+                return
+        for u in result.unmatched_secondary:
+            if u.function.name == function_name:
+                console.print(
+                    f"[green]Function '{function_name}' was added in secondary binary[/green]"
+                )
+                proj1.close()
+                proj2.close()
+                return
+        console.print(f"[red]Function not found: {function_name}[/red]")
+        proj1.close()
+        proj2.close()
+        return
+
+    # Get detailed block diff
+    func_diff = analyzer.get_function_diff(match)
+
+    # Show function info
+    console.print(
+        f"[cyan]Primary:[/cyan]   {match.primary.name} @ {match.primary.address:#x} ({match.primary.size} bytes)"
+    )
+    console.print(
+        f"[cyan]Secondary:[/cyan] {match.secondary.name} @ {match.secondary.address:#x} ({match.secondary.size} bytes)"
+    )
+    console.print(f"[cyan]Similarity:[/cyan] {match.similarity:.1%}")
+    console.print(f"[cyan]Strategy:[/cyan]   {match.strategy.name}")
+
+    if match.is_identical:
+        console.print("\n[green]Functions are byte-identical[/green]")
+    else:
+        # Show block comparison
+        console.print("\n[bold]Basic Block Analysis:[/bold]")
+        console.print(f"  Matched blocks: {len(func_diff.matched_blocks)}")
+        console.print(f"  Primary-only:   {len(func_diff.unmatched_primary)}")
+        console.print(f"  Secondary-only: {len(func_diff.unmatched_secondary)}")
+
+        if func_diff.matched_blocks:
+            console.print("\n[bold]Matched Blocks:[/bold]")
+            table = Table()
+            table.add_column("Primary", style="green")
+            table.add_column("Secondary", style="green")
+            table.add_column("Similarity")
+
+            for bm in func_diff.matched_blocks:
+                sim_color = "green" if bm.similarity > 0.9 else "yellow"
+                table.add_row(
+                    f"{bm.primary.address:#x}",
+                    f"{bm.secondary.address:#x}",
+                    f"[{sim_color}]{bm.similarity:.1%}[/{sim_color}]",
+                )
+            console.print(table)
+
+        if func_diff.unmatched_primary:
+            console.print("\n[bold red]Removed Blocks (in primary only):[/bold red]")
+            for b in func_diff.unmatched_primary:
+                console.print(f"  - {b.address:#x} ({len(b.instructions)} insns)")
+
+        if func_diff.unmatched_secondary:
+            console.print("\n[bold green]Added Blocks (in secondary only):[/bold green]")
+            for b in func_diff.unmatched_secondary:
+                console.print(f"  + {b.address:#x} ({len(b.instructions)} insns)")
+
+    proj1.close()
+    proj2.close()
+
+
+@main.command("patch-analysis")
+@click.argument("primary", type=click.Path(exists=True))
+@click.argument("secondary", type=click.Path(exists=True))
+@click.option("-v", "--verbose", is_flag=True, help="Show all modified functions")
+def patch_analysis_cmd(primary: str, secondary: str, verbose: bool) -> None:
+    """Analyze security-relevant changes between two binaries.
+
+    Identifies modifications to functions that may be security-relevant based
+    on their names (validation, authentication, parsing, etc.).
+    """
+    from chimera import Project
+    from chimera.analysis.diff import BinaryDiffAnalyzer
+
+    console.print("[bold]Security Patch Analysis[/bold]\n")
+    console.print(f"  Primary:   {primary}")
+    console.print(f"  Secondary: {secondary}\n")
+
+    proj1 = Project.load(primary)
+    proj2 = Project.load(secondary)
+    proj1.analyze()
+    proj2.analyze()
+
+    analyzer = BinaryDiffAnalyzer(proj1, proj2)
+    security_changes = analyzer.find_security_changes()
+
+    if not security_changes:
+        console.print("[dim]No security-relevant changes detected[/dim]")
+        proj1.close()
+        proj2.close()
+        return
+
+    console.print(
+        f"[bold yellow]Found {len(security_changes)} security-relevant changes:[/bold yellow]\n"
+    )
+
+    table = Table(title="Security-Relevant Modified Functions")
+    table.add_column("Function", style="cyan")
+    table.add_column("Similarity")
+    table.add_column("Strategy")
+    table.add_column("Category")
+
+    # Categorize security functions
+    categories = {
+        "auth": ["auth", "login", "password", "credential", "session", "token"],
+        "validation": ["valid", "verify", "check", "sanitize", "escape", "filter"],
+        "bounds": ["bound", "overflow", "underflow", "size", "length", "limit", "max", "min"],
+        "parsing": ["parse", "decode", "encode", "input"],
+        "crypto": ["crypt", "hash", "sign", "cert", "key"],
+    }
+
+    for match in sorted(security_changes, key=lambda m: m.similarity):
+        name_lower = match.primary.name.lower()
+        category = "other"
+        for cat, keywords in categories.items():
+            if any(kw in name_lower for kw in keywords):
+                category = cat
+                break
+
+        cat_colors = {
+            "auth": "red",
+            "validation": "yellow",
+            "bounds": "magenta",
+            "parsing": "blue",
+            "crypto": "cyan",
+            "other": "white",
+        }
+        cat_color = cat_colors.get(category, "white")
+
+        sim_color = (
+            "green" if match.similarity > 0.8 else "yellow" if match.similarity > 0.6 else "red"
+        )
+        table.add_row(
+            match.primary.name,
+            f"[{sim_color}]{match.similarity:.1%}[/{sim_color}]",
+            match.strategy.name,
+            f"[{cat_color}]{category}[/{cat_color}]",
+        )
+
+    console.print(table)
+
+    # Show recommendations
+    console.print("\n[bold]Recommendations:[/bold]")
+    auth_changes = [
+        m
+        for m in security_changes
+        if any(k in m.primary.name.lower() for k in ["auth", "login", "password"])
+    ]
+    if auth_changes:
+        console.print("[red]  ! Authentication-related changes detected - review carefully[/red]")
+
+    bounds_changes = [
+        m
+        for m in security_changes
+        if any(k in m.primary.name.lower() for k in ["bound", "size", "length", "overflow"])
+    ]
+    if bounds_changes:
+        console.print(
+            "[yellow]  ! Bounds-checking changes detected - potential memory safety fix[/yellow]"
+        )
+
+    console.print("\n[dim]Use 'chimera diff-func' to examine specific function changes.[/dim]")
+
+    proj1.close()
+    proj2.close()
+
+
 @main.command("interactive")
 @click.argument("binary", type=click.Path(exists=True))
 def interactive_mode(binary: str) -> None:

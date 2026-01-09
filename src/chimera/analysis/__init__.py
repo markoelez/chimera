@@ -1,6 +1,20 @@
 """Static analysis module."""
 
 from chimera.analysis.cfg import EdgeType, BasicBlock, ControlFlowGraph
+from chimera.analysis.diff import (
+    ChangeType,
+    DiffResult,
+    FunctionDiff,
+    FunctionMatch,
+    MatchStrategy,
+    FunctionHasher,
+    BasicBlockMatch,
+    FunctionMatcher,
+    MatchConfidence,
+    BasicBlockMatcher,
+    UnmatchedFunction,
+    BinaryDiffAnalyzer,
+)
 from chimera.analysis.objc import (
     ObjCIvar,
     ObjCClass,
@@ -47,4 +61,16 @@ __all__ = [
     "ObjCClass",
     "ObjCMetadata",
     "ObjCAnalyzer",
+    "DiffResult",
+    "FunctionMatch",
+    "FunctionDiff",
+    "BasicBlockMatch",
+    "UnmatchedFunction",
+    "MatchConfidence",
+    "MatchStrategy",
+    "ChangeType",
+    "FunctionHasher",
+    "FunctionMatcher",
+    "BasicBlockMatcher",
+    "BinaryDiffAnalyzer",
 ]

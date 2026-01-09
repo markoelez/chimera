@@ -13,6 +13,7 @@ from chimera.analysis import (
     XRefType,
     ObjCClass,
     BasicBlock,
+    DiffResult,
     ObjCMethod,
     StringMatch,
     XRefManager,
@@ -20,10 +21,12 @@ from chimera.analysis import (
     ObjCMetadata,
     PatternMatch,
     XRefAnalyzer,
+    FunctionMatch,
     PatternScanner,
     StringSearcher,
     ControlFlowGraph,
     FunctionAnalyzer,
+    BinaryDiffAnalyzer,
 )
 from chimera.decompiler.codegen import decompile_function
 
@@ -50,6 +53,9 @@ __all__ = [
     "ObjCClass",
     "ObjCMethod",
     "ObjCMetadata",
+    "DiffResult",
+    "FunctionMatch",
+    "BinaryDiffAnalyzer",
 ]
 
 
@@ -275,6 +281,35 @@ class Project:
         if self._objc:
             return self._objc.get_class(name)
         return None
+
+    def diff(self, other: "Project") -> DiffResult:
+        """Compare this project with another and return diff results.
+
+        Args:
+            other: Another Project to compare against
+
+        Returns:
+            DiffResult containing matched and unmatched functions
+        """
+        analyzer = BinaryDiffAnalyzer(self, other)
+        return analyzer.analyze()
+
+    @classmethod
+    def diff_files(cls, primary: str | Path, secondary: str | Path) -> DiffResult:
+        """Convenience method to diff two binary files.
+
+        Args:
+            primary: Path to the primary (old) binary
+            secondary: Path to the secondary (new) binary
+
+        Returns:
+            DiffResult comparing the two binaries
+        """
+        proj1 = cls.load(primary)
+        proj2 = cls.load(secondary)
+        proj1.analyze()
+        proj2.analyze()
+        return proj1.diff(proj2)
 
     @property
     def entry_point(self) -> int:
