@@ -583,9 +583,31 @@ class ARM64Lifter:
         # Get base register
         if mem_op.base_reg:
             base = self._get_reg(mem_op.base_reg.name)
+            base_name = mem_op.base_reg.name.lower()
         else:
             base = IRValue.constant(0, IRType.PTR)
+            base_name = ""
 
-        # Note: displacement and index handling simplified
-        # A full implementation would emit ADD instructions
+        # Check for SP-relative addressing
+        is_sp_relative = base_name in ("sp", "x31", "wsp")
+
+        # Handle displacement
+        offset = getattr(mem_op, "offset", 0) or 0
+        if not isinstance(offset, int):
+            offset = 0
+
+        if offset != 0:
+            # Create a composite address value that encodes the offset
+            result = IRValue(
+                ir_type=IRType.PTR,
+                name=f"&[{base.name}+{offset:#x}]",
+                stack_offset=offset if is_sp_relative else None,
+                is_address=True,
+            )
+            return result
+
+        # No offset - just the base
+        base.is_address = True
+        if is_sp_relative:
+            base.stack_offset = 0
         return base

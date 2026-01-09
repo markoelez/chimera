@@ -34,7 +34,9 @@ from chimera.analysis.search import (
     StringSearcher,
 )
 from chimera.analysis.dataflow import DataFlowAnalyzer, ReachingDefinitions
+from chimera.analysis.arguments import ArgumentInfo, ArgumentAnalyzer
 from chimera.analysis.functions import Function, FunctionAnalyzer
+from chimera.analysis.stack_frame import StackFrame, StackVariable, StackFrameAnalyzer
 
 __all__ = [
     "BasicBlock",
@@ -73,4 +75,11 @@ __all__ = [
     "FunctionMatcher",
     "BasicBlockMatcher",
     "BinaryDiffAnalyzer",
+    # Stack frame analysis
+    "StackVariable",
+    "StackFrame",
+    "StackFrameAnalyzer",
+    # Argument detection
+    "ArgumentInfo",
+    "ArgumentAnalyzer",
 ]

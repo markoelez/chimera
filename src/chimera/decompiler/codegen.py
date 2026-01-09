@@ -9,11 +9,13 @@ from chimera.decompiler.ir import (
     IRFunction,
     IRInstruction,
 )
+from chimera.decompiler.types import PointerType, ResolvedType, PrimitiveType
 from chimera.decompiler.structuring import StructureType, StructuredBlock
 
 if TYPE_CHECKING:
     from chimera.loader.symbols import SymbolTable
     from chimera.analysis.functions import Function
+    from chimera.analysis.stack_frame import StackFrame
 
 
 class CCodeGenerator:
@@ -23,14 +25,25 @@ class CCodeGenerator:
         self,
         ir_func: IRFunction,
         symbols: "SymbolTable | None" = None,
+        type_map: dict[str, ResolvedType] | None = None,
+        stack_frame: "StackFrame | None" = None,
     ) -> None:
         self.ir_func = ir_func
         self.symbols = symbols
+        self.type_map = type_map or {}
+        self.stack_frame = stack_frame
         self._indent = 0
         self._output: list[str] = []
         self._var_types: dict[str, str] = {}
         self._temp_names: dict[str, str] = {}
         self._name_counter = 0
+        self._declared_locals: set[str] = set()
+        self._stack_var_map: dict[int, str] = {}  # offset -> var name
+
+        # Build stack variable map
+        if stack_frame:
+            for var in stack_frame.variables:
+                self._stack_var_map[var.offset] = var.name
 
     def generate(self, structured: StructuredBlock | None = None) -> str:
         """Generate C code."""
@@ -44,6 +57,9 @@ class CCodeGenerator:
         self._emit("{")
         self._indent += 1
 
+        # Emit local variable declarations
+        self._emit_local_declarations()
+
         if structured:
             self._emit_structured(structured)
         else:
@@ -54,6 +70,38 @@ class CCodeGenerator:
         self._emit("}")
 
         return "\n".join(self._output)
+
+    def _emit_local_declarations(self) -> None:
+        """Emit local variable declarations at start of function."""
+        declarations: list[str] = []
+
+        # Add stack variables
+        if self.stack_frame:
+            for var in self.stack_frame.variables:
+                if not var.is_argument:
+                    type_str = self._resolved_type_to_c(var.var_type) if var.var_type else "int64_t"
+                    declarations.append(f"{type_str} {var.name};")
+                    self._declared_locals.add(var.name)
+
+        # Emit declarations
+        if declarations:
+            for decl in declarations:
+                self._emit(decl)
+            self._emit("")  # Blank line after declarations
+
+    def _resolved_type_to_c(self, resolved_type: ResolvedType | None) -> str:
+        """Convert resolved type to C type string."""
+        if resolved_type is None:
+            return "int64_t"
+
+        if isinstance(resolved_type, PrimitiveType):
+            return str(resolved_type)
+
+        if isinstance(resolved_type, PointerType):
+            pointee = self._resolved_type_to_c(resolved_type.pointee)
+            return f"{pointee}*"
+
+        return "int64_t"
 
     def _emit(self, line: str) -> None:
         """Emit a line of code."""
@@ -221,9 +269,16 @@ class CCodeGenerator:
         if len(insn.operands) < 2:
             return
 
-        addr = self._value_to_c(insn.operands[0])
+        addr_val = insn.operands[0]
         val = self._value_to_c(insn.operands[1])
-        self._emit(f"*({addr}) = {val};")
+
+        # Check for stack variable
+        if addr_val.stack_offset is not None and addr_val.stack_offset in self._stack_var_map:
+            var_name = self._stack_var_map[addr_val.stack_offset]
+            self._emit(f"{var_name} = {val};")
+        else:
+            addr = self._value_to_c(addr_val)
+            self._emit(f"*({addr}) = {val};")
 
     def _emit_load(self, insn: IRInstruction) -> None:
         """Emit a load operation."""
@@ -231,8 +286,15 @@ class CCodeGenerator:
             return
 
         dest = self._get_var_name(insn.dest)
-        addr = self._value_to_c(insn.operands[0])
-        self._emit(f"{dest} = *({addr});")
+        addr_val = insn.operands[0]
+
+        # Check for stack variable
+        if addr_val.stack_offset is not None and addr_val.stack_offset in self._stack_var_map:
+            var_name = self._stack_var_map[addr_val.stack_offset]
+            self._emit(f"{dest} = {var_name};")
+        else:
+            addr = self._value_to_c(addr_val)
+            self._emit(f"{dest} = *({addr});")
 
     def _insn_to_expr(self, insn: IRInstruction) -> str:
         """Convert instruction to C expression."""
@@ -365,11 +427,20 @@ def decompile_function(
     """High-level decompilation function."""
     from chimera.decompiler.lifter import ARM64Lifter
     from chimera.decompiler.simplify import IRSimplifier
+    from chimera.analysis.stack_frame import StackFrameAnalyzer
     from chimera.decompiler.structuring import ControlFlowStructurer
+    from chimera.decompiler.type_inference import infer_types
+
+    # Analyze stack frame
+    stack_analyzer = StackFrameAnalyzer(func)
+    stack_frame = stack_analyzer.analyze()
 
     # Lift to IR
     lifter = ARM64Lifter()
     ir_func = lifter.lift_function(func)
+
+    # Run type inference
+    type_map = infer_types(ir_func)
 
     # Simplify
     simplifier = IRSimplifier(ir_func)
@@ -379,6 +450,6 @@ def decompile_function(
     structurer = ControlFlowStructurer(ir_func)
     structured = structurer.structure()
 
-    # Generate code
-    codegen = CCodeGenerator(ir_func, symbols)
+    # Generate code with type information
+    codegen = CCodeGenerator(ir_func, symbols, type_map, stack_frame)
     return codegen.generate(structured)

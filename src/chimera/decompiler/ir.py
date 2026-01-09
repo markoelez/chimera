@@ -1,9 +1,12 @@
 """Intermediate representation for decompilation."""
 
 from enum import IntEnum, auto
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from dataclasses import field, dataclass
 from collections.abc import Iterator
+
+if TYPE_CHECKING:
+    from chimera.decompiler.types import ResolvedType
 
 
 class IRType(IntEnum):
@@ -123,6 +126,10 @@ class IRValue:
     name: str = ""
     const_value: int | float | None = None
     version: int = 0  # For SSA
+    # Type system fields
+    resolved_type: "ResolvedType | None" = None  # Inferred high-level type
+    stack_offset: int | None = None  # Offset from SP if stack variable
+    is_address: bool = False  # True if this value is an address/pointer
 
     def __str__(self) -> str:
         if self.const_value is not None:
